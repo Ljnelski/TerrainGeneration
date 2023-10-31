@@ -1,0 +1,6 @@
+{
+  "hlsl.additionalIncludeDirectories": ["."],
+  "hlsl.virtualDirectoryMappings": {
+    "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl": "C:\\Users\\Liam\\Documents\\Unity\\Personal\\TerrainGeneration\\Library\\PackageCache\\com.unity.render-pipelines.universal@12.1.8\\ShaderLibrary\\Lighting.hlsl"
+  }
+}
