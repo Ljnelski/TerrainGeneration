@@ -29,7 +29,9 @@ public class LandscapeGeneratorEditor : Editor
     }
 
     public override void OnInspectorGUI()
-    { 
+    {
+        EditorGUI.BeginChangeCheck();
+
         serializedObject.Update();
 
         LandscapeGenerator meshGenerator = (LandscapeGenerator)target;
@@ -38,19 +40,25 @@ public class LandscapeGeneratorEditor : Editor
         if(DrawDefaultInspector())
         {
             
-        }
-
-        if (_autoUpdate.boolValue)
-        {
-            meshGenerator.GenerateMesh();
-        }
+        }        
 
         if (GUILayout.Button("Generate Mesh"))
         {
-            meshGenerator.GenerateMesh();
+            meshGenerator.GenerateTerrain();
+        }
+
+        if(GUILayout.Button("RunErosion"))
+        {
+            meshGenerator.StartErosion();
         }
 
         EditorGUILayout.EndFoldoutHeaderGroup();
+
+
+        if (EditorGUI.EndChangeCheck() && _autoUpdate.boolValue)
+        {
+            meshGenerator.GenerateTerrain();
+        }
 
         serializedObject.ApplyModifiedProperties();        
     }
