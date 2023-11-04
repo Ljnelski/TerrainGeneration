@@ -71,10 +71,16 @@ public struct LandscapeData
     {
         float vertexXPosition = xx * _meshVertexSpacing - _worldcenterOffsetX;
         float vertexZPosition = _worldCenterOffsetY - yy * _meshVertexSpacing;
-        float vertexYPosition = Mathf.Max(_heightMap[xx, yy] * _meshCeiling, _meshFloor);
+        float vertexYPosition = HeightMapValueToWorldSpace(_heightMap[xx,yy]); //Mathf.Max(_heightMap[xx, yy] * _meshCeiling, _meshFloor);
 
         //Debug.Log("RainDropLocation: " + vertexYPosition);
 
         return new Vector3(vertexXPosition, vertexYPosition, vertexZPosition);
+    }   
+
+    // Inputs a heightMap Value and returns the height value in World Space
+    public float HeightMapValueToWorldSpace(float value)
+    {
+        return Mathf.Max(value * _meshCeiling, _meshFloor);
     }
 }
