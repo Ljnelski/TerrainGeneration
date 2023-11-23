@@ -1,3 +1,4 @@
+using Newtonsoft.Json.Bson;
 using System;
 using System.Collections;
 using UnityEngine;
@@ -20,6 +21,7 @@ public class LandscapeGenerator : MonoBehaviour
     [SerializeField] private float _vertexSpacing = 2f;
     [SerializeField] private float _maxHeight = 1f;
     [SerializeField] private float _minHeight = 0f;
+    [SerializeField] private int _meshLOD = 1;
 
     [Header("Erosion")]
     [SerializeField] private float _erosionTickTime = 0.5f;
@@ -35,7 +37,7 @@ public class LandscapeGenerator : MonoBehaviour
     private LandscapeData _landscapeData;
 
     private float _currentErosionIterations;
-    private bool isEroding = false;
+    //private bool isEroding = false;
 
     // Start is called before the first frame update
     void Awake()
@@ -56,25 +58,13 @@ public class LandscapeGenerator : MonoBehaviour
 
         float[,] heightMapData;
 
-        heightMapData = _gradient.Generate(_vertexCountX, _vertexCountY);
-        heightMapData = _noise.Generate(heightMapData);
+        //heightMapData = _gradient.Generate(_vertexCountX, _vertexCountY);
+        heightMapData = _noise.Generate(_vertexCountX, _vertexCountY);
 
         _landscapeData.SetHeightMapData(heightMapData);
 
-        Mesh mesh;
-        //mesh = _meshGenerator.GenerateMesh(heightMapData, _vertexSpacing, _maxHeight, _minHeight);
-
-        mesh = _meshGenerator.GenerateMesh(_landscapeData);
-
-        _landscapeData.SetMesh(mesh);
-
-
-
-
-
-        //GetComponent<MeshFilter>().mesh = _meshGenerator.GenerateMesh(heightMapData, _vertexSpacing, _maxHeight, _minHeight);
-        GetComponent<MeshFilter>().mesh = mesh;
-
+        UpdateMesh();
+       
         if (_generateTexture)
         {
             UpdateTexture(heightMapData);
@@ -86,7 +76,13 @@ public class LandscapeGenerator : MonoBehaviour
         }       
     }   
 
-    
+    public void UpdateMesh()
+    {        
+        Mesh mesh = _meshGenerator.GenerateMesh(_landscapeData);
+        _landscapeData.SetMesh(mesh);
+        GetComponent<MeshFilter>().mesh = mesh;
+    }
+
     public void UpdateTexture(float[,] heightMapData)
     {
         //Texture2D newTexture = _textureGenerator.ValueFromHeightMap(heightMapData);
@@ -140,8 +136,9 @@ public class LandscapeGenerator : MonoBehaviour
         {
 
             //Debug.Log("RUN EROSION");
-            _erosion.ErosionPass(_landscapeData);
-            _currentErosionIterations -= 1;
+            _landscapeData = _erosion.ErosionPass(_landscapeData);
+            UpdateMesh();
+            _currentErosionIterations -= 1;          
 
             yield return new WaitForSeconds(_erosionTickTime);
         }

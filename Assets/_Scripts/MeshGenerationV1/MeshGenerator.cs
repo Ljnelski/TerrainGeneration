@@ -154,8 +154,9 @@ public class MeshGenerator : MonoBehaviour
         mesh.vertices = _vertices;
         mesh.triangles = _triangles;
         mesh.uv = _uvs;
-
         mesh.RecalculateNormals();
+        mesh.RecalculateTangents();
+
         return mesh;
     }
 }

@@ -1,193 +1,509 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
 using UnityEngine;
 
 public class Erosion : MonoBehaviour
 {
     [SerializeField] private GameObject _rainMarker;
 
-    [SerializeField] private int _seed;
-    [SerializeField] private int _maxAliveDroplets = 10;
+    [SerializeField] private int _maxDropletLifetime = 10;
+    [SerializeField] private int _dropletIterations = 10;
 
-    private List<WaterDrop> _droplets;
-    private int _remaingPasses;
+    [SerializeField] private int _seed;
+
+    [Header("Droplet Settings")]
+    [Range(0f, 1f)]
+    [SerializeField] private float _dropletInteria = 0.5f;
+    [SerializeField] private float _dropletCapacity = 2f;
+    [SerializeField] private float _dropletMinSlope = -0.05f;
+    [SerializeField] private float _dropletDeposition = 0.25f;
+    [SerializeField] private float _dropletErosion = 1f; // base amount of sediment to be taken per drop
+    [SerializeField] private float _dropletGravity = 1f;
+    [SerializeField] private float _dropletIntialWater = 1f;
+    [SerializeField] private float _dropletEvaporation = 0.05f;
+    [SerializeField] private int _dropletErodeRadius = 1;
+
+    [Header("Debug")]
+    [SerializeField] private bool _drawRainDrops = false;
+
+    private List<List<Vector3>> _lastDropletTrails;
+    private ErosionBrush _dropletBrush;
 
     private System.Random rand;
-
-
 
     // Start is called before the first frame update
     void Start()
     {
-        _droplets = new List<WaterDrop>();
         rand = new System.Random(_seed);
+        _lastDropletTrails = new List<List<Vector3>>();
     }
 
-    public void ErosionPass(LandscapeData landscapeData)
+    // Cell -> Refers the quad that the drop is located on, which is defined by four vertexs on the mesh
+    public LandscapeData ErosionPass(LandscapeData landscapeData)
     {
+        _dropletBrush = CalculateBrush();
+
         if (rand == null)
         {
             rand = new System.Random();
         }
 
-        if (_droplets == null)
+        if (_lastDropletTrails == null)
         {
-            _droplets = new List<WaterDrop>();
+            _lastDropletTrails = new List<List<Vector3>>();
         }
 
-        float halfVertexSpacing = landscapeData.VertexSpacing / 2;
+        ClearRainDrops();
 
-        // Spawn Droplets
-        for (int i = 0; i < _maxAliveDroplets - _droplets.Count; i++)
+        // Droplet Values
+        Vector2 pos;
+        Vector2 dir;
+        float speed;
+        float water;
+        float sediment;
+
+        for (int i = 0; i < _dropletIterations; i++)
         {
-            Debug.Log("Spawning Droplets");
+            // Intalize the Droplet
 
-            int xVertexIndex = rand.Next(0, landscapeData.MeshXVertexCount);
-            int yVertexIndex = rand.Next(0, landscapeData.MeshYVertexCount);
+            // Intial Position
+            int posX = rand.Next(0, landscapeData.MeshXVertexCount - 2);
+            int posY = rand.Next(0, landscapeData.MeshYVertexCount - 2);
 
-            Vector2Int dropletHeightMapPos = new Vector2Int(xVertexIndex, yVertexIndex);
-            // Droplet Conversion to world space for visual Aid
-            // Height map Y position is converted to Z position world space
+            // Intail Direction
+            int dirX = rand.Next(0, 1);
+            int dirY = rand.Next(0, 1);
 
-            WaterDrop waterDrop = new WaterDrop(dropletHeightMapPos, Vector3.zero, new Vector2Int(0, 0), 0);
-            Vector3 dropWorldPos = CalculateDropWorldSpace(landscapeData, waterDrop);
-            waterDrop.WPos = dropWorldPos;
+            pos = new Vector2(posX, posY);
+            dir = new Vector2(dirX, dirY);
+            speed = 1f;
+            water = _dropletIntialWater;
+            sediment = 0f;
 
-            waterDrop.trail.Add(waterDrop.WPos);
+            // Debug add list to stash droplets positions every iteration
+            _lastDropletTrails.Add(new List<Vector3>());
 
-            _droplets.Add(waterDrop);
-            Instantiate(_rainMarker, waterDrop.WPos, Quaternion.identity);
+            for (int k = 0; k < _maxDropletLifetime; k++)
+            {
+                //-----Gradient and Movement-----//
+
+                // coord is the position on the height map, so x index and y index
+                int coordX = (int)pos.x;
+                int coordY = (int)pos.y;                
+
+                // If the water droplet has zero water, velocity or direction, kill it.
+                if (speed < 0 || water <= 0)
+                {
+                    //Debug.Log("Droplet Terminated at interation: " + k + " because it has no velocity water");
+
+                    break;
+                }
+
+                float cellPosX = pos.x - coordX;
+                float cellPosY = pos.y - coordY;
+
+                float depositX = pos.x;
+                float depositY = pos.y;
+
+
+                Vector2 gradient = CalculateGradient(landscapeData.HeightMap, pos);
+                float height = CalculateHeight(landscapeData.HeightMap, pos);
+
+                // Record Droplet location for debug purposes
+                if (_drawRainDrops)
+                {
+                    _lastDropletTrails[i].Add(CalculateDropWorldSpace(landscapeData, cellPosX, cellPosY, coordX, coordY, height));
+                }
+
+                // Use the gradient to calculate the new direction
+                Vector2 dirNew = dir * _dropletInteria - new Vector2(gradient.x, gradient.y) * (1 - _dropletInteria);
+                dirNew.Normalize();
+
+                // move the drop
+                pos = pos + dirNew;
+
+                // if the droplet is out of bounds kill it
+                if (pos.x >= landscapeData.MeshXVertexCount - 1 || pos.x < 0 || pos.y >= landscapeData.MeshYVertexCount - 1 || pos.y < 0) break;
+
+                float hNew = CalculateHeight(landscapeData.HeightMap, pos);
+                float hDif = hNew - height;
+
+                //Debug.Log(hDif);
+
+                // ------ Erosion And Deposition ------ //                
+
+                // If the height difference is positive the droplet when up a hill
+                if (hDif > 0)
+                {
+                    //Debug.Log("droplet went up a hill");
+                    // Drop just the sediment needed to fill the hole
+                    if (sediment > hDif)
+                    {
+                        landscapeData.HeightMap = Deposit(landscapeData.HeightMap, depositX, depositY, hDif);
+
+                        sediment -= hDif;
+                    }
+                    else if (sediment <= hDif)
+                    {
+                        landscapeData.HeightMap = Deposit(landscapeData.HeightMap, depositX, depositY, sediment);
+
+                        sediment = 0;
+                    }
+                }
+                else if (hDif < 0) // The droplet moves down the hill
+                {
+                    //Debug.Log("Droplet went down the hill");
+                    float capacity = Mathf.Max(-hDif, _dropletMinSlope) * speed * water * _dropletCapacity;
+
+                    // Deposit sediment if the droplet has space for less sediment
+                    if (sediment >= capacity)
+                    {
+                        float sedimentDeposit = (sediment - capacity) * _dropletDeposition;
+                        landscapeData.HeightMap = Deposit(landscapeData.HeightMap, pos.x, pos.y, sedimentDeposit);
+
+                        sediment -= sedimentDeposit;
+                    }
+
+                    // Erode from the previous position if the droplet has space for more sediment
+                    if (sediment < capacity)
+                    {
+                        float sedimentErode = Mathf.Min((capacity - sediment) * _dropletErosion, -hDif);
+                        landscapeData.HeightMap = ErodeHeightmap(_dropletBrush, landscapeData.HeightMap, depositX, depositY, sedimentErode);
+                        sediment += sedimentErode;
+                    }
+                }
+
+                // ----- Update Water & Speed ----- //
+
+                speed = Mathf.Sqrt(speed * speed + hDif * _dropletGravity);
+                water = water * (1 - _dropletEvaporation);
+            }
+
         }
 
-        // Do Pass
-        for (int i = 0; i < _droplets.Count; i++)
+        return landscapeData;
+    }
+
+
+    Vector2 CalculateGradient(float[,] heightMap, Vector2 pos)
+    {
+        int coordX = (int)pos.x;
+        int coordY = (int)pos.y;
+
+        float cellPosX = pos.x - coordX;
+        float cellPosY = pos.y - coordY;
+
+        float hpxy = heightMap[coordX, coordY];
+        float hpx1y = heightMap[coordX + 1, coordY];
+        float hpxy1 = heightMap[coordX, coordY + 1];
+        float hpx1y1 = heightMap[coordX + 1, coordY + 1];
+
+        // og
+        //float gx = (hpx1y - hpxy) * (1 - cellPosY) + (hpx1y1 - hpxy1) * cellPosY;
+        //float gy = (hpxy1 - hpxy) * (1 - cellPosX) + (hpx1y1 - hpx1y) * cellPosX;
+        float gx = (hpx1y - hpxy) * (1 - cellPosY) + (hpx1y1 - hpxy1) * cellPosY;
+        float gy = (hpxy1 - hpxy) * (1 - cellPosX) + (hpx1y1 - hpx1y) * cellPosX;
+
+        return new Vector2(gx, gy);
+    }
+
+    float CalculateHeight(float[,] heightMap, Vector2 pos)
+    {
+        int coordX = (int)pos.x;
+        int coordY = (int)pos.y;
+
+        float cellPosX = pos.x - coordX;
+        float cellPosY = pos.y - coordY;
+
+        float hpxy = heightMap[coordX, coordY];
+        float hpx1y = heightMap[coordX + 1, coordY];
+        float hpxy1 = heightMap[coordX, coordY + 1];
+        float hpx1y1 = heightMap[coordX + 1, coordY + 1];
+
+        return (hpx1y1 * cellPosX + hpxy1 * (1 - cellPosX)) * cellPosY + (hpx1y * cellPosX + hpxy * (1 - cellPosX)) * (1 - cellPosY);
+    }
+
+    private float[,] Deposit(float[,] heightMap, float posX, float posY, float amount)
+    {
+        int coordX = (int)posX;
+        int coordY = (int)posY;
+
+        float cellPosX = posX - coordX;
+        float cellPosY = posY - coordY;
+
+        heightMap[coordX, coordY] += amount * (1 - cellPosX) * (1 - cellPosY);
+        heightMap[coordX + 1, coordY] += amount * cellPosX * (1 - cellPosY);
+        heightMap[coordX, coordY + 1] += amount * (1 - cellPosX) * cellPosY;
+        heightMap[coordX + 1, coordY + 1] += amount * cellPosX * cellPosY;
+
+        return heightMap;
+    }
+
+    private float[,] Deposit(float cellPosX, float cellPosY, float amount, float[,] heightMap)
+    {
+        // THESE ARE NOT CORRECT
+        heightMap[(int)cellPosX, (int)cellPosY] += amount * (1 - cellPosX) * (1 - cellPosY);
+        heightMap[(int)cellPosX + 1, (int)cellPosY] += amount * cellPosX * (1 - cellPosY);
+        heightMap[(int)cellPosX, (int)cellPosY + 1] += amount * (1 - cellPosX) * cellPosY;
+        heightMap[(int)cellPosX + 1, (int)cellPosY + 1] += amount * cellPosX * cellPosY;
+
+        return heightMap;
+    }
+
+    // Remove value from the height map using a brush and return the total amount taken
+    private float[,] ErodeHeightmap(ErosionBrush brush, float[,] heightMap, float posX, float posY, float amount)
+    {
+        float totalSedimentTaken = 0f;
+
+        int coordX = (int)posX;
+        int coordY = (int)posY;
+
+        int heightMapWidth = heightMap.GetLength(0) - 1;
+        int heightMapLength = heightMap.GetLength(1) - 1;
+
+        int brushWidth = brush.Cells.GetLength(0) - 1;
+        int brushLength = brush.Cells.GetLength(1) - 1;
+
+        for (int yy = 0; yy < brushLength; yy++)
         {
+            for (int xx = 0; xx < brushWidth; xx++)
+            {
+                BrushCell cell = brush.Cells[yy, xx];
 
-            Debug.Log("Erosion Pass Happening for Droplet: " + i);
+                // If cell has no weight then skip it
+                if (cell.weight <= 0) continue;
 
-            WaterDrop waterDrop = _droplets[i];
+                // Calculate where on the height map the brush cell will be taken from.
+                int heightMapCoordX = coordX + cell.coord.x;
+                int heightMapCoordY = coordY + cell.coord.y;
 
-            float pxy, pxy1, px1y, px1y1; // Four vertexs around where droplet is located pxy = current location.
-            float gx, gy; // Gradient Vector
-            Vector2 gxy;
-            Vector2 uv;
-            float v = 0, u = 0; // Direction of water flow (v is x component, u is y component)           
+                // Check if the point is inside the heightmap
+                if (heightMapCoordX > heightMapWidth || heightMapCoordX < 0 || heightMapCoordY > heightMapLength || heightMapCoordY < 0)
+                    continue;
 
-            pxy = landscapeData.HeightMap[waterDrop.Pos.x, waterDrop.Pos.y];
-            px1y = landscapeData.HeightMap[waterDrop.Pos.x + 1, waterDrop.Pos.y];
-            pxy1 = landscapeData.HeightMap[waterDrop.Pos.x, waterDrop.Pos.y + 1];
-            px1y1 = landscapeData.HeightMap[waterDrop.Pos.x + 1, waterDrop.Pos.y + 1];
+                // Calculate how much sediment is taken
+                float sedimentTaken = cell.weight * amount;
+                //Debug.Log(sedimentTaken);
+                //Debug.Log("Sediment before subtraction: " + heightMap[heightMapCoordX, heightMapCoordY]);
+                heightMap[heightMapCoordX, heightMapCoordY] -= sedimentTaken;
+                //Debug.Log("Sediment after subtraction: " + heightMap[heightMapCoordX, heightMapCoordY]);
 
-            v = waterDrop.Dir.x;
-            u = waterDrop.Dir.y;
 
-            // Gradient which changes the way the water flows
-            gy = (px1y - pxy) * (1 - v) + (px1y1 - pxy1) * v;
-            gx = (pxy1 - pxy) * (1 - u) + (px1y1 - px1y) * u;
-
-            // Normalize Gradient
-            Debug.Log("Gradient Vector: " + gx + ", " + gy);
-            gxy = new Vector2(gx, gy).normalized;
-
-            // Set Droplet Velocity
-            waterDrop.Dir.Set(Mathf.RoundToInt(gxy.x), Mathf.RoundToInt(gxy.y));         
-
-            // Move Droplet
-            waterDrop.Pos += waterDrop.Dir;
-
-            // Calcuate Droplet Position in worldspace
-            waterDrop.WPos = CalculateDropWorldSpace(landscapeData, waterDrop);
-            waterDrop.trail.Add(waterDrop.WPos);
-
-            // Assign the updated drop back to the list;
-            _droplets[i] = waterDrop;           
+                totalSedimentTaken += sedimentTaken;
+            }
         }
+
+        //Debug.Log("Total Sediment taken: " + totalSedimentTaken + ", vs amount calculated to be taken: " + amount);
+        return heightMap;
+    }
+
+    // Precalculates a brush
+    public ErosionBrush CalculateBrush()
+    {
+        int brushHeight;
+        int brushWidth;
+
+        BrushCell[,] brushCells;
+
+        Vector2 brushCentre = new Vector2(0.5f, 0.5f);
+        float totalWeight = 0;
+        int wPosIndexOffset = _dropletErodeRadius - 1;
+
+
+        if (_dropletErodeRadius == 1)
+        {
+            brushCells = new BrushCell[2, 2];
+
+            brushCells[0, 0] = new BrushCell(new Vector2Int(0, 0), 0.25f);
+            brushCells[1, 0] = new BrushCell(new Vector2Int(1, 0), 0.25f);
+            brushCells[0, 1] = new BrushCell(new Vector2Int(0, 1), 0.25f);
+            brushCells[1, 1] = new BrushCell(new Vector2Int(1, 1), 0.25f);
+
+            totalWeight = 1f;
+        }
+        else
+        {
+            brushHeight = _dropletErodeRadius * 2;
+            brushWidth = _dropletErodeRadius * 2;
+
+            brushCells = new BrushCell[brushHeight, brushWidth];
+
+            for (int brushYCoord = 0; brushYCoord <= _dropletErodeRadius; brushYCoord++)
+            {
+                for (int brushXCoord = 0; brushXCoord <= _dropletErodeRadius; brushXCoord++)
+                {
+                    Vector2Int cellCoord;
+
+                    float posCentreX = brushXCoord;
+                    float posCentreY = brushYCoord;
+
+                    float inRadius = posCentreX * posCentreX + posCentreY * posCentreY - _dropletErodeRadius * _dropletErodeRadius;
+
+                    //Debug.Log("pos (" + brushXCoord + ", " + brushYCoord + ")" + " is " + inRadius);
+                    if (inRadius <= 1)
+                    {
+                        BrushCell brushCell;
+
+                        cellCoord = new Vector2Int(brushXCoord, brushYCoord);
+                        brushCell = CreateBrushCell(cellCoord, brushCentre);
+
+                        brushCells[brushXCoord + wPosIndexOffset, brushYCoord + wPosIndexOffset] = brushCell;
+                        totalWeight += brushCell.weight;
+
+                        // Mirror just on X axis
+                        if (brushXCoord > 1)
+                        {
+                            cellCoord = new Vector2Int(-brushXCoord + 1, brushYCoord);
+                            brushCell = CreateBrushCell(cellCoord, brushCentre);
+
+                            brushCells[cellCoord.x + wPosIndexOffset, cellCoord.y + wPosIndexOffset] = brushCell;
+                            totalWeight += brushCell.weight;
+                        }
+                        // Mirror just on Y axis
+                        if (brushYCoord > 1)
+                        {
+                            cellCoord = new Vector2Int(brushXCoord, -brushYCoord + 1);
+                            brushCell = CreateBrushCell(cellCoord, brushCentre);
+
+                            brushCells[cellCoord.x + wPosIndexOffset, cellCoord.y + wPosIndexOffset] = brushCell;
+                            totalWeight += brushCell.weight;
+                        }
+                        // Mirror on X and Y axis
+                        if (brushXCoord > 1 && brushYCoord > 1)
+                        {
+                            cellCoord = new Vector2Int(-brushXCoord + 1, -brushYCoord + 1);
+                            brushCell = CreateBrushCell(cellCoord, brushCentre);
+
+                            brushCells[cellCoord.x + wPosIndexOffset, cellCoord.y + wPosIndexOffset] = brushCell;
+                            totalWeight += brushCell.weight;
+                        }
+                    }
+                }
+            }
+        }
+
+        float totalWeightNormalized = 0;
+
+        // Normalize Weights
+        for (int yy = 0; yy < brushCells.GetLength(0); yy++)
+        {
+            for (int xx = 0; xx < brushCells.GetLength(1); xx++)
+            {
+                if (brushCells[xx, yy].weight > 0)
+                {
+                    brushCells[xx, yy].weight = brushCells[xx, yy].weight / totalWeight;
+                    totalWeightNormalized += brushCells[xx, yy].weight;
+                    //Debug.Log("");
+                    //Debug.Log("Brush Data Index: (" + xx + ", " + yy + ")");
+                    //Debug.Log("Cell Position: (" + brushCells[xx, yy].coord.x + ", " + brushCells[xx, yy].coord.y + ")");
+                    //Debug.Log("Cell Weight: (" + brushCells[xx, yy].weight + ")");
+                }
+
+            }
+        }
+        //Debug.Log("Total Weight: " + totalWeight);
+        //Debug.Log("Total Weight Normalized: " + totalWeightNormalized);
+
+        return new ErosionBrush(brushCells);
+    }
+
+    private BrushCell CreateBrushCell(Vector2Int cellCoord, Vector2 brushCentre)
+    {
+        float cellWeight = 1 - Vector2.Distance(brushCentre, new Vector2(cellCoord.x, -cellCoord.y + 1)) / _dropletErodeRadius;
+        return new BrushCell(cellCoord, cellWeight);
     }
 
     public void ClearRainDrops()
     {
-        _droplets.Clear();
+        _lastDropletTrails.Clear();
     }
 
-    private Vector3 CalculateDropWorldSpace(LandscapeData landscapeData, WaterDrop drop) 
-    {
-        int xPos = drop.Pos.x;
-        int yPos = drop.Pos.y;
+    // Takes the heights of the cell, and weighs them using the distance from the vector pos (0-1, 0-1) which is the position of the drop in the sell
+    private Vector3 CalculateDropWorldSpace(LandscapeData landscapeData, float posX, float posY, int coordX, int coordY, float height)
+    {        
+        Vector3 worldPos = landscapeData.HeightMapPositionToWorldSpace(coordX, coordY);
+        worldPos.x += posX;
+        worldPos.y = landscapeData.HeightMapValueToWorldSpace(height);
+        worldPos.z += posY;
 
-        Vector3 pos1 = landscapeData.HeightMapPositionToWorldSpace(xPos, yPos + 1);//landscapeData.HeightMap[xPos, yPos + 1];
-        Vector3 pos2 = landscapeData.HeightMapPositionToWorldSpace(xPos + 1, yPos); //landscapeData.HeightMap[xPos + 1, yPos];
 
-        //float centreHeight = Mathf.Lerp(height1, height2, 0.5f);
-        Vector3 centrePos = Vector3.Lerp(pos1, pos2, 0.5f);
-
-        //float rainDropHeight = landscapeData.HeightMapValueToWorldSpace(centreHeight);
-
-        //Vector3 Offset = new Vector3(0.5f, 0f, 0.5f);
-        //Vector3 WPos = landscapeData.HeightMapPositionToWorldSpace(xPos, yPos, Offset);
-        //WPos.y = rainDropHeight;
-
-        return centrePos;
+        return worldPos;
     }
 
     private void OnDrawGizmos()
     {
-        if (_droplets != null)
+        if (_drawRainDrops)
         {
-            for (int i = 0; i < _droplets.Count; i++)
+            if (_lastDropletTrails != null && _lastDropletTrails.Count > 0)
             {
-                WaterDrop drop = _droplets[i];
-
-                for (int k = 0; k < drop.trail.Count; k++)
+                foreach (List<Vector3> dropletTrail in _lastDropletTrails)
                 {
-                    if (k == drop.trail.Count - 1)
+                    for (int k = 0; k < dropletTrail.Count; k++)
                     {
-                        Gizmos.color = Color.white;
-                    }
-                    else
-                    {
-                        float placeInPath = (float)k / drop.trail.Count;
-                        Color wayPointColor = Color.Lerp(Color.black, Color.white, placeInPath);
-                        Gizmos.color = wayPointColor;
-                    }
-                    Gizmos.DrawSphere(drop.trail[k], 0.5f);
+                        if (k == dropletTrail.Count - 1)
+                        {
+                            Gizmos.color = Color.white;
+                        }
+                        else
+                        {
+                            float placeInPath = (float)k / dropletTrail.Count;
+                            Color wayPointColor = Color.Lerp(Color.black, Color.white, placeInPath);
+                            Gizmos.color = wayPointColor;
+                        }
+                        Gizmos.DrawSphere(dropletTrail[k], 0.5f);
 
-                    // Draw Line between spheres
-                    if (k > 0 && drop.trail.Count > 1)
-                    {
-                        Gizmos.color = Color.white;
-                        Gizmos.DrawLine(drop.trail[k - 1],
-                            drop.trail[k]);
+                        // Draw Line between spheres
+                        if (k > 0 && dropletTrail.Count > 1)
+                        {
+                            Gizmos.color = Color.white;
+                            Gizmos.DrawLine(dropletTrail[k - 1], dropletTrail[k]);
+                        }
                     }
                 }
             }
-            
         }
     }
 }
 
 struct WaterDrop
 {
-    public WaterDrop(Vector2Int pos, Vector3 wPos, Vector2Int dir, float vel)
+    public WaterDrop(int id, Vector2 pos, Vector2 dir, float vel)
     {
         // position on the heightmap
+        Id = id;
         Pos = pos;
-        WPos = wPos;
         Dir = dir;
         Vel = vel;
         Water = 0f;
         Sediment = 0f;
-
-        trail = new List<Vector3>();
     }
 
-    public Vector2Int Pos;
-    public Vector2Int Dir;
-    public Vector3 WPos;
+    public int Id;
+    public Vector2 Pos;
+    public Vector2 Dir;
     public float Vel;
     public float Water;
     public float Sediment;
+}
 
-    public List<Vector3> trail;
+public struct ErosionBrush
+{
+    public ErosionBrush(BrushCell[,] brushCells)
+    {
+        Cells = brushCells;
+    }
+
+    public BrushCell[,] Cells;
+}
+
+public struct BrushCell
+{
+    public BrushCell(Vector2Int coord, float weight)
+    {
+        this.coord = coord;
+        this.weight = weight;
+    }
+
+    public Vector2Int coord;
+    public float weight;
 }

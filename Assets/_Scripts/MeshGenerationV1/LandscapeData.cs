@@ -62,20 +62,27 @@ public struct LandscapeData
     public bool HasMeshVertexParameters { get => _hasMeshVertexParameters; }
     public bool HasHeightMapData { get => _hasHeightMapData;  }
     public bool HasMeshData { get => _hasMeshData; }
+   
+    public Vector3 HeightMapPositionToWorldSpace(float xx, float yy)
+    {
+        int coordX = (int)xx;
+        int coordY = (int)yy;
 
-    public Vector3 HeightMapPositionToWorldSpace(int xx, int yy, Vector3 Offset)
-    {
-        return HeightMapPositionToWorldSpace(xx,yy) + Offset;
-    }
-    public Vector3 HeightMapPositionToWorldSpace(int xx, int yy)
-    {
         float vertexXPosition = xx * _meshVertexSpacing - _worldcenterOffsetX;
         float vertexZPosition = _worldCenterOffsetY - yy * _meshVertexSpacing;
-        float vertexYPosition = HeightMapValueToWorldSpace(_heightMap[xx,yy]); //Mathf.Max(_heightMap[xx, yy] * _meshCeiling, _meshFloor);
 
-        //Debug.Log("RainDropLocation: " + vertexYPosition);
-
-        return new Vector3(vertexXPosition, vertexYPosition, vertexZPosition);
+        try
+        {
+            float vertexYPosition = HeightMapValueToWorldSpace(_heightMap[coordX, coordY]);
+            return new Vector3(vertexXPosition, vertexYPosition, vertexZPosition);
+        }
+        catch (IndexOutOfRangeException e)
+        {
+            //Debug.LogError("LandscapeData ERROR: Failed to translate a heightMap position to world space with Error: " + e);
+            //Debug.Log("xx: " + xx + "yy: " + yy);
+        }
+        
+        return Vector3.zero;
     }   
 
     // Inputs a heightMap Value and returns the height value in World Space

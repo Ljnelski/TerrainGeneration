@@ -127,12 +127,12 @@ Material:
     - _DstBlend: 0
     - _EnvironmentReflections: 1
     - _GlossMapScale: 0
-    - _Glossiness: 0
+    - _Glossiness: 0.07
     - _GlossyReflections: 0
     - _Grass: 0
     - _GrassFalloff: 0.05
     - _GrassThreshold: 0.5
-    - _HeightFalloff: 4.41
+    - _HeightFalloff: 5.63
     - _MaxGrassAngle: 0
     - _MaxHeght: 8.06
     - _MaxHeight: 0
@@ -147,12 +147,18 @@ Material:
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
     - _SrcBlend: 1
-    - _Steepness: 0.33
+    - _Steepness: 0.107
     - _SteepnessFalloff: 1
     - _Stepness: 0.44
     - _Surface: 0
     - _TessellationGrassDistance: 0.1
     - _Test: 0
+    - _UseAoMap: 0
+    - _UseColorMap: 0
+    - _UseEmissiveMap: 0
+    - _UseMetallicMap: 0
+    - _UseNormalMap: 0
+    - _UseRoughnessMap: 0
     - _WindFrequency: 0.01
     - _WorkflowMode: 1
     - _ZWrite: 1
@@ -164,6 +170,8 @@ Material:
     - _Rock: {r: 0.4056604, g: 0.31170693, b: 0.07079922, a: 0}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
     - _TipColor: {r: 1, g: 1, b: 1, a: 1}
+    - _UvOffset: {r: 0, g: 0, b: 0, a: 0}
+    - _UvTiling: {r: 1, g: 1, b: 0, a: 0}
     - _WindVelocity: {r: 1, g: 0, b: 0, a: 0}
   m_BuildTextureStacks: []
 --- !u!114 &5022600937072893466

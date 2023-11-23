@@ -11,12 +11,17 @@ public class ErosionEditor : Editor
 
         if (DrawDefaultInspector())
         {
-
+            
         }
 
         if (GUILayout.Button("Clear Drops"))
         {
             erosion.ClearRainDrops();
+        }
+
+        if (GUILayout.Button("Calculate Brush"))
+        {
+            erosion.CalculateBrush();
         }
     }
 }

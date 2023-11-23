@@ -65,7 +65,7 @@ public class Noise : GeneratedTexture
                     float sampleX = (xx - halfWidth) / _scale * frequency + offset.x;
                     float sampleY = (yy - halfHeight) / _scale * frequency + offset.y;
 
-                    float perlinValue = Mathf.PerlinNoise(sampleX, sampleY) * 2 - 1f;
+                    float perlinValue = Mathf.PerlinNoise(sampleX, sampleY); // * 2 - 1f;
                     heightValue += perlinValue * amplitude;
 
                     frequency *= _lacunarity;
