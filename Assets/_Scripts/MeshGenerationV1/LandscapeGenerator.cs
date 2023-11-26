@@ -1,6 +1,7 @@
 using Newtonsoft.Json.Bson;
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 public class LandscapeGenerator : MonoBehaviour
@@ -15,13 +16,20 @@ public class LandscapeGenerator : MonoBehaviour
 
     // > Unity uses Y axis for height, so Y Axis is translated to the Z access when 
     // Generating points
+
+    [SerializeField] private GameObject _chunk;
+
+    [Header("LandscapeOptions")]
+    [SerializeField] private int _worldSize; // number of chuncks to render
+
     [Header("Mesh Options")]
-    [Range(0, 241)][SerializeField] private int _vertexCountX = 3;
-    [Range(0, 241)][SerializeField] private int _vertexCountY = 3;
+    const int _vertexCountX = 241; // Each chunckX is this big
+    const int _vertexCountY = 241; // Each chunckY is this big
     [SerializeField] private float _vertexSpacing = 2f;
     [SerializeField] private float _maxHeight = 1f;
     [SerializeField] private float _minHeight = 0f;
-    [SerializeField] private int _meshLOD = 1;
+    [Range(0,6)]
+    [SerializeField] private int _meshLOD = 0;
 
     [Header("Erosion")]
     [SerializeField] private float _erosionTickTime = 0.5f;
@@ -34,7 +42,11 @@ public class LandscapeGenerator : MonoBehaviour
     [SerializeField] private bool _generateTexture;
     [SerializeField] private bool _saveTexture;
 
+    [Header("Debug")]
+    [SerializeField] private GameObject _debugFlag;
     private LandscapeData _landscapeData;
+    private List<Vector3> _debugPositions;
+    
 
     private float _currentErosionIterations;
     //private bool isEroding = false;
@@ -50,20 +62,40 @@ public class LandscapeGenerator : MonoBehaviour
 
     public void GenerateTerrain()
     {
+        _debugPositions = new List<Vector3>();
+        _debugPositions.Clear();
+
 #if UNITY_EDITOR
         GetScriptReferences();
 #endif
-        _landscapeData.SetMeshVertexParameters(_vertexCountX, _vertexCountY, _vertexSpacing, _maxHeight, _minHeight);
-
 
         float[,] heightMapData;
 
+        _landscapeData = new LandscapeData();
+        _landscapeData.SetWorldParameters(_worldSize, _vertexCountX, _vertexCountY, _meshLOD, _vertexSpacing, _maxHeight, _minHeight);
         //heightMapData = _gradient.Generate(_vertexCountX, _vertexCountY);
-        heightMapData = _noise.Generate(_vertexCountX, _vertexCountY);
-
+        heightMapData = _noise.Generate(_vertexCountX * _worldSize, _vertexCountY * _worldSize);
         _landscapeData.SetHeightMapData(heightMapData);
 
-        UpdateMesh();
+        for (int chunkY = 0; chunkY < _worldSize; chunkY++)
+        { 
+            for (int chunkX = 0; chunkX < _worldSize; chunkX++)
+            {
+
+                float chunkPosX = _landscapeData.TopLeftX + (_vertexCountX * _vertexSpacing) * chunkX;
+                float chunkPosZ = _landscapeData.TopLeftY + (_vertexCountY * _vertexSpacing) * chunkY;
+
+                Vector3 chunkPos = new Vector3(chunkPosX, 0f, chunkPosZ);
+                Mesh chunkMesh = null;//_meshGenerator.GenerateMesh(_landscapeData, chunkX, chunkY);
+
+                Chunk chunk = new Chunk(chunkPos, chunkMesh);
+
+                _landscapeData.SetChuck(chunkX, chunkY, chunk);
+            }
+        }
+
+        LoadMesh();
+        //UpdateMesh();
        
         if (_generateTexture)
         {
@@ -76,11 +108,16 @@ public class LandscapeGenerator : MonoBehaviour
         }       
     }   
 
-    public void UpdateMesh()
-    {        
-        Mesh mesh = _meshGenerator.GenerateMesh(_landscapeData);
-        _landscapeData.SetMesh(mesh);
-        GetComponent<MeshFilter>().mesh = mesh;
+    public void LoadMesh()
+    {
+        foreach (var chunck in _landscapeData.Chuncks)
+        {
+            _debugPositions.Add(chunck.pos);
+        }
+
+        Debug.Log(_landscapeData.Chuncks.Length);
+        Debug.Log(_landscapeData.Chuncks.GetLength(0));
+        Debug.Log(_landscapeData.Chuncks.GetLength(1));
     }
 
     public void UpdateTexture(float[,] heightMapData)
@@ -137,11 +174,22 @@ public class LandscapeGenerator : MonoBehaviour
 
             //Debug.Log("RUN EROSION");
             _landscapeData = _erosion.ErosionPass(_landscapeData);
-            UpdateMesh();
+            //UpdateMesh();
             _currentErosionIterations -= 1;          
 
             yield return new WaitForSeconds(_erosionTickTime);
         }
+    }
+
+    private void OnDrawGizmos()
+    {
+        if(_debugPositions != null)
+        {
+            foreach (Vector3 pos in _debugPositions)
+            {
+                Gizmos.DrawWireSphere(pos, 20f);
+            }
+        }        
     }
 }
 
