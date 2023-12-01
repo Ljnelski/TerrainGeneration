@@ -67,8 +67,8 @@ public class Erosion : MonoBehaviour
             // Intalize the Droplet
 
             // Intial Position
-            int posX = rand.Next(0, landscapeData.MeshXVertexCount - 2);
-            int posY = rand.Next(0, landscapeData.MeshYVertexCount - 2);
+            int posX = rand.Next(0, landscapeData.ChunkSizeX - 2);
+            int posY = rand.Next(0, landscapeData.ChunkSizeY - 2);
 
             // Intail Direction
             int dirX = rand.Next(0, 1);
@@ -123,7 +123,7 @@ public class Erosion : MonoBehaviour
                 pos = pos + dirNew;
 
                 // if the droplet is out of bounds kill it
-                if (pos.x >= landscapeData.MeshXVertexCount - 1 || pos.x < 0 || pos.y >= landscapeData.MeshYVertexCount - 1 || pos.y < 0) break;
+                if (pos.x >= landscapeData.ChunkSizeX - 1 || pos.x < 0 || pos.y >= landscapeData.ChunkSizeY - 1 || pos.y < 0) break;
 
                 float hNew = CalculateHeight(landscapeData.HeightMap, pos);
                 float hDif = hNew - height;

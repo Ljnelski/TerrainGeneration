@@ -17,7 +17,7 @@ public class LandscapeGenerator : MonoBehaviour
     // > Unity uses Y axis for height, so Y Axis is translated to the Z access when 
     // Generating points
 
-    [SerializeField] private GameObject _chunk;
+    [SerializeField] private GameObject _chunkObject;
 
     [Header("LandscapeOptions")]
     [SerializeField] private int _worldSize; // number of chuncks to render
@@ -28,7 +28,7 @@ public class LandscapeGenerator : MonoBehaviour
     [SerializeField] private float _vertexSpacing = 2f;
     [SerializeField] private float _maxHeight = 1f;
     [SerializeField] private float _minHeight = 0f;
-    [Range(0,6)]
+    [Range(0, 6)]
     [SerializeField] private int _meshLOD = 0;
 
     [Header("Erosion")]
@@ -46,10 +46,9 @@ public class LandscapeGenerator : MonoBehaviour
     [SerializeField] private GameObject _debugFlag;
     private LandscapeData _landscapeData;
     private List<Vector3> _debugPositions;
-    
 
+    private List<GameObject> _chunkObjs;
     private float _currentErosionIterations;
-    //private bool isEroding = false;
 
     // Start is called before the first frame update
     void Awake()
@@ -73,51 +72,125 @@ public class LandscapeGenerator : MonoBehaviour
 
         _landscapeData = new LandscapeData();
         _landscapeData.SetWorldParameters(_worldSize, _vertexCountX, _vertexCountY, _meshLOD, _vertexSpacing, _maxHeight, _minHeight);
-        //heightMapData = _gradient.Generate(_vertexCountX, _vertexCountY);
+        //heightMapData = _gradient.Generate(_vertexCountX * _worldSize, _vertexCountY * _worldSize);
         heightMapData = _noise.Generate(_vertexCountX * _worldSize, _vertexCountY * _worldSize);
         _landscapeData.SetHeightMapData(heightMapData);
 
-        for (int chunkY = 0; chunkY < _worldSize; chunkY++)
-        { 
-            for (int chunkX = 0; chunkX < _worldSize; chunkX++)
-            {
+        GenerateChunks();
+        LoadChunks();
 
-                float chunkPosX = _landscapeData.TopLeftX + (_vertexCountX * _vertexSpacing) * chunkX;
-                float chunkPosZ = _landscapeData.TopLeftY + (_vertexCountY * _vertexSpacing) * chunkY;
-
-                Vector3 chunkPos = new Vector3(chunkPosX, 0f, chunkPosZ);
-                Mesh chunkMesh = null;//_meshGenerator.GenerateMesh(_landscapeData, chunkX, chunkY);
-
-                Chunk chunk = new Chunk(chunkPos, chunkMesh);
-
-                _landscapeData.SetChuck(chunkX, chunkY, chunk);
-            }
-        }
-
-        LoadMesh();
-        //UpdateMesh();
-       
         if (_generateTexture)
         {
             UpdateTexture(heightMapData);
         }
 
-        if(_saveTexture)
+        if (_saveTexture)
         {
-           _textureGenerator.SaveTexture(heightMapData);
-        }       
-    }   
+            _textureGenerator.SaveTexture(heightMapData);
+        }
+    }
 
-    public void LoadMesh()
+    private void GenerateChunks()
     {
-        foreach (var chunck in _landscapeData.Chuncks)
+        for (int chunkY = 0; chunkY < _worldSize; chunkY++)
         {
-            _debugPositions.Add(chunck.pos);
+            for (int chunkX = 0; chunkX < _worldSize; chunkX++)
+            {
+                // Calculate the location where the chunck will be place in world space (current Set up is top left origin)
+                float chunkPosX = _landscapeData.BottomLeftX + (_vertexCountX - 1) * _vertexSpacing * (chunkX + 0.5f);
+                float chunkPosZ = _landscapeData.BottomLeftZ + (_vertexCountY - 1) * _vertexSpacing * (chunkY + 0.5f);
+
+                Vector3 chunkPos = new Vector3(chunkPosX, 0f, chunkPosZ);
+
+                // The coordinates of the chunks origin on the height map
+                int chunkCoordX = chunkX * (_landscapeData.ChunkSizeX - 1);
+                int chunkCoordY = chunkY * (_landscapeData.ChunkSizeY - 1);
+
+                Mesh chunkMesh = _meshGenerator.GenerateMesh(_landscapeData, chunkCoordX, chunkCoordY);
+
+                ChunkData chunk = new ChunkData(chunkPos, chunkMesh);
+
+                _landscapeData.SetChuck(chunkX, chunkY, chunk);
+            }
+        }
+    }
+
+    // Gets a Reference to all pre existing chunk gameObjects in scene    
+    public void LoadChunks()
+    {
+        GetChunkObjectsFromScene();
+
+        if (_chunkObject == null || _chunkObjs == null || _chunkObjs.Count != _worldSize * _worldSize)
+        {
+            ClearChunkObjects();
+            InstantiateChunkObjects();
+        }
+        else
+        {
+            UpdateChunkObjects();
+        }
+    }
+
+    public void GetChunkObjectsFromScene()
+    {
+        _chunkObjs = new List<GameObject>();
+
+        Transform[] chunkObjects = gameObject.transform.GetComponentsInChildren<Transform>();
+        for (var i = 0; i < chunkObjects.Length; i++)
+        {
+            if (chunkObjects[i] == gameObject.transform) continue;
+
+            _chunkObjs.Add(chunkObjects[i].gameObject);
+        }
+    }
+
+    private void InstantiateChunkObjects()
+    {
+        for (int yy = 0; yy < _landscapeData.ChunkData.GetLength(0); yy++)
+        {
+            for (int xx = 0; xx < _landscapeData.ChunkData.GetLength(1); xx++)
+            {
+                ChunkData chunk = _landscapeData.ChunkData[xx, yy];
+
+                GameObject chunkGameObject = Instantiate(_chunkObject, chunk.pos, Quaternion.identity, gameObject.transform);
+                chunkGameObject.name = "Chunk (" + xx + ", " + yy + ")";
+                chunkGameObject.GetComponent<MeshFilter>().sharedMesh = chunk.mesh;
+                _chunkObjs.Add(chunkGameObject);
+            }
+        }
+    }
+
+    // Loads all chunkObjects in scene with the most recent meshes
+    private void UpdateChunkObjects()
+    {
+        for (int i = 0; i < _chunkObjs.Count; i++)
+        {
+            ChunkData chunk = _landscapeData.ChunkData[i / _worldSize, i % _worldSize];
+            _chunkObjs[i].GetComponent<MeshFilter>().sharedMesh = chunk.mesh;
+        }
+    }
+
+    // Removes reference to chunkObj from chunkObjs and destroys it from the world
+    private void ClearChunkObjects()
+    {
+        for (int i = 0; i < _chunkObjs.Count; i++)
+        {
+            GameObject chunkObj = _chunkObjs[i];
+            Debug.Log("chunkObj: " + chunkObj.name);
+
+            if (Application.isPlaying)
+            {
+                Destroy(chunkObj);
+            }
+            else
+            {
+                DestroyImmediate(chunkObj);
+            }
+
         }
 
-        Debug.Log(_landscapeData.Chuncks.Length);
-        Debug.Log(_landscapeData.Chuncks.GetLength(0));
-        Debug.Log(_landscapeData.Chuncks.GetLength(1));
+        _chunkObjs.Clear();
+
     }
 
     public void UpdateTexture(float[,] heightMapData)
@@ -127,18 +200,16 @@ public class LandscapeGenerator : MonoBehaviour
         newTexture.Apply();
         _textureDisplay.DrawTexture(newTexture);
     }
-
     public void StartErosion()
     {
-        if(_erosion == null)
+        if (_erosion == null)
         {
             _erosion = GetComponent<Erosion>();
-        }
 
+        }
         _currentErosionIterations = _erosionIterations;
         StartCoroutine(RunErosion());
     }
-
     private void GetScriptReferences()
     {
         if (_textureGenerator == null)
@@ -166,30 +237,30 @@ public class LandscapeGenerator : MonoBehaviour
             _gradient = gameObject.GetComponent<Gradient>();
         }
     }
-
     private IEnumerator RunErosion()
     {
-        while(_currentErosionIterations > 0)
+        while (_currentErosionIterations > 0)
         {
-
             //Debug.Log("RUN EROSION");
             _landscapeData = _erosion.ErosionPass(_landscapeData);
-            //UpdateMesh();
-            _currentErosionIterations -= 1;          
+
+            GenerateChunks();
+            LoadChunks();
+
+            _currentErosionIterations -= 1;
 
             yield return new WaitForSeconds(_erosionTickTime);
         }
     }
-
     private void OnDrawGizmos()
     {
-        if(_debugPositions != null)
+        if (_debugPositions != null)
         {
             foreach (Vector3 pos in _debugPositions)
             {
                 Gizmos.DrawWireSphere(pos, 20f);
             }
-        }        
+        }
     }
 }
 
