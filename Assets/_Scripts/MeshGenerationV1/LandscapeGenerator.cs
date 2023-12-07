@@ -2,6 +2,7 @@ using Newtonsoft.Json.Bson;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Net;
 using UnityEngine;
 
 public class LandscapeGenerator : MonoBehaviour
@@ -12,7 +13,6 @@ public class LandscapeGenerator : MonoBehaviour
     [SerializeField] private Noise _noise;
     [SerializeField] private Gradient _gradient;
     [SerializeField] private Erosion _erosion;
-
 
     // > Unity uses Y axis for height, so Y Axis is translated to the Z access when 
     // Generating points
@@ -25,7 +25,7 @@ public class LandscapeGenerator : MonoBehaviour
     [Header("Mesh Options")]
     const int _vertexCountX = 241; // Each chunckX is this big
     const int _vertexCountY = 241; // Each chunckY is this big
-    [SerializeField] private float _vertexSpacing = 2f;
+    [SerializeField] private float _vertexSpacing = 1f;
     [SerializeField] private float _maxHeight = 1f;
     [SerializeField] private float _minHeight = 0f;
     [Range(0, 6)]
@@ -73,7 +73,9 @@ public class LandscapeGenerator : MonoBehaviour
         _landscapeData = new LandscapeData();
         _landscapeData.SetWorldParameters(_worldSize, _vertexCountX, _vertexCountY, _meshLOD, _vertexSpacing, _maxHeight, _minHeight);
         //heightMapData = _gradient.Generate(_vertexCountX * _worldSize, _vertexCountY * _worldSize);
-        heightMapData = _noise.Generate(_vertexCountX * _worldSize, _vertexCountY * _worldSize);
+        int heightMapSize = (_vertexCountX * _worldSize) + 2;
+
+        heightMapData = _noise.Generate(heightMapSize, heightMapSize);
         _landscapeData.SetHeightMapData(heightMapData);
 
         GenerateChunks();
@@ -92,13 +94,17 @@ public class LandscapeGenerator : MonoBehaviour
 
     private void GenerateChunks()
     {
+        _landscapeData.SetWorldParameters(_worldSize, _vertexCountX, _vertexCountY, _meshLOD, _vertexSpacing, _maxHeight, _minHeight);
+
         for (int chunkY = 0; chunkY < _worldSize; chunkY++)
         {
             for (int chunkX = 0; chunkX < _worldSize; chunkX++)
             {
-                // Calculate the location where the chunck will be place in world space (current Set up is top left origin)
-                float chunkPosX = _landscapeData.BottomLeftX + (_vertexCountX - 1) * _vertexSpacing * (chunkX + 0.5f);
-                float chunkPosZ = _landscapeData.BottomLeftZ + (_vertexCountY - 1) * _vertexSpacing * (chunkY + 0.5f);
+                // Calculate the location where the chunck will be place in world space (current Set up is centre origin)               
+                float chunkSize = (_vertexCountX - 1) * _vertexSpacing;
+
+                float chunkPosX = _landscapeData.BottomLeftX + chunkX * chunkSize + chunkSize / 2;
+                float chunkPosZ = _landscapeData.BottomLeftZ + chunkY * chunkSize + chunkSize / 2;
 
                 Vector3 chunkPos = new Vector3(chunkPosX, 0f, chunkPosZ);
 
@@ -120,15 +126,7 @@ public class LandscapeGenerator : MonoBehaviour
     {
         GetChunkObjectsFromScene();
 
-        if (_chunkObject == null || _chunkObjs == null || _chunkObjs.Count != _worldSize * _worldSize)
-        {
-            ClearChunkObjects();
-            InstantiateChunkObjects();
-        }
-        else
-        {
-            UpdateChunkObjects();
-        }
+        UpdateChunkObjects();
     }
 
     public void GetChunkObjectsFromScene()
@@ -144,53 +142,62 @@ public class LandscapeGenerator : MonoBehaviour
         }
     }
 
-    private void InstantiateChunkObjects()
+    private void InstantiateChunkObject(int xx, int yy)
     {
-        for (int yy = 0; yy < _landscapeData.ChunkData.GetLength(0); yy++)
-        {
-            for (int xx = 0; xx < _landscapeData.ChunkData.GetLength(1); xx++)
-            {
-                ChunkData chunk = _landscapeData.ChunkData[xx, yy];
-
-                GameObject chunkGameObject = Instantiate(_chunkObject, chunk.pos, Quaternion.identity, gameObject.transform);
-                chunkGameObject.name = "Chunk (" + xx + ", " + yy + ")";
-                chunkGameObject.GetComponent<MeshFilter>().sharedMesh = chunk.mesh;
-                _chunkObjs.Add(chunkGameObject);
-            }
-        }
+        GameObject chunkGameObject = Instantiate(_chunkObject, Vector3.zero, Quaternion.identity, gameObject.transform);
+        chunkGameObject.name = "Chunk (" + xx + ", " + yy + ")";
+        _chunkObjs.Add(chunkGameObject);
     }
 
     // Loads all chunkObjects in scene with the most recent meshes
     private void UpdateChunkObjects()
     {
-        for (int i = 0; i < _chunkObjs.Count; i++)
+        // Clear any excess chunks
+        if (_chunkObjs.Count > _landscapeData.ChunkData.Length)
         {
-            ChunkData chunk = _landscapeData.ChunkData[i / _worldSize, i % _worldSize];
-            _chunkObjs[i].GetComponent<MeshFilter>().sharedMesh = chunk.mesh;
+            int lastChunkInUseIndex = _landscapeData.ChunkData.Length - 1;
+            for (int i = _chunkObjs.Count - 1; i > lastChunkInUseIndex; i--)
+            {
+                DestroyChunk(i);
+            }
         }
+
+        // Update the chunks with 
+        int worldWidth = _landscapeData.ChunkData.GetLength(0);
+        for (int yy = 0; yy < _landscapeData.ChunkData.GetLength(1); yy++)
+        {
+            for (int xx = 0; xx < worldWidth; xx++)
+            {
+                int chunkObjIndex = xx + yy * worldWidth;
+
+                if (chunkObjIndex > _chunkObjs.Count - 1)
+                {
+                    InstantiateChunkObject(xx, yy);
+                }
+
+                ChunkData chunk = _landscapeData.ChunkData[xx, yy];
+                GameObject chunkObj = _chunkObjs[chunkObjIndex];
+                chunkObj.transform.position = chunk.pos;
+                chunkObj.GetComponent<MeshFilter>().sharedMesh = chunk.mesh;
+            }
+        }
+
+       
     }
-
-    // Removes reference to chunkObj from chunkObjs and destroys it from the world
-    private void ClearChunkObjects()
+    
+    private void DestroyChunk(int chunkIndex)
     {
-        for (int i = 0; i < _chunkObjs.Count; i++)
+        GameObject chunkObject = _chunkObjs[chunkIndex];
+        _chunkObjs.RemoveAt(chunkIndex);
+
+        if (Application.isPlaying)
         {
-            GameObject chunkObj = _chunkObjs[i];
-            Debug.Log("chunkObj: " + chunkObj.name);
-
-            if (Application.isPlaying)
-            {
-                Destroy(chunkObj);
-            }
-            else
-            {
-                DestroyImmediate(chunkObj);
-            }
-
+            Destroy(chunkObject);
         }
-
-        _chunkObjs.Clear();
-
+        else
+        {
+            DestroyImmediate(chunkObject);
+        }
     }
 
     public void UpdateTexture(float[,] heightMapData)
@@ -241,7 +248,6 @@ public class LandscapeGenerator : MonoBehaviour
     {
         while (_currentErosionIterations > 0)
         {
-            //Debug.Log("RUN EROSION");
             _landscapeData = _erosion.ErosionPass(_landscapeData);
 
             GenerateChunks();

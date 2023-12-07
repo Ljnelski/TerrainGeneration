@@ -3,7 +3,7 @@ using UnityEngine;
 
 public class LandscapeData
 {
-    public void SetWorldParameters(int worldSize, int chunkSizeX, int chunkSizeY,  int meshLOD, float vertexSpacing, float meshCeiling, float meshFloor)
+    public void SetWorldParameters(int worldSize, int chunkSizeX, int chunkSizeY, int meshLOD, float vertexSpacing, float meshCeiling, float meshFloor)
     {
         _worldSize = worldSize;
         _chunkSizeX = chunkSizeX;
@@ -13,10 +13,13 @@ public class LandscapeData
         _meshCeiling = meshCeiling;
         _meshFloor = meshFloor;
 
-        
+
         // Calculate the offset that is used to place the vertices in the world to make the mesh is centred in the centre of the world
-        _bottomLeftX = (worldSize * (chunkSizeX - 1) / -2f) * vertexSpacing;
-        _bottomLeftZ = (worldSize * (chunkSizeY - 1) / -2f) * vertexSpacing;
+        _bottomLeftX = worldSize * (chunkSizeX - 1) / -2f * vertexSpacing;
+        _bottomLeftZ = worldSize * (chunkSizeY - 1) / -2f * vertexSpacing;
+
+        //Debug.Log("_BottomLeftX: " + _bottomLeftX);
+        //Debug.Log("_BottomLeftZ: " + _bottomLeftZ);
 
         _chunks = new ChunkData[worldSize, worldSize];
 
@@ -83,16 +86,16 @@ public class LandscapeData
         }
 
         return Vector3.zero;
-    }   
+    }
 
     // Inputs a heightMap Value and returns the height value in world space
     public float HeightMapValueToWorldSpace(float value)
     {
         return Mathf.Max(value * _meshCeiling, _meshFloor);
     }
-     
+
     public void SetChuck(int x, int y, ChunkData chunk)
     {
-        _chunks[x,y] = chunk;
-    }   
+        _chunks[x, y] = chunk;
+    }
 }
