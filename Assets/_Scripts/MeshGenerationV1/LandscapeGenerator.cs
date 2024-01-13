@@ -121,7 +121,6 @@ public class LandscapeGenerator : MonoBehaviour
         }
     }
 
-    // Gets a Reference to all pre existing chunk gameObjects in scene    
     public void LoadChunks()
     {
         GetChunkObjectsFromScene();
@@ -129,6 +128,7 @@ public class LandscapeGenerator : MonoBehaviour
         UpdateChunkObjects();
     }
 
+    // Gets a Reference to all existing chunk gameObjects in scene
     public void GetChunkObjectsFromScene()
     {
         _chunkObjs = new List<GameObject>();
@@ -142,14 +142,6 @@ public class LandscapeGenerator : MonoBehaviour
         }
     }
 
-    private void InstantiateChunkObject(int xx, int yy)
-    {
-        GameObject chunkGameObject = Instantiate(_chunkObject, Vector3.zero, Quaternion.identity, gameObject.transform);
-        chunkGameObject.name = "Chunk (" + xx + ", " + yy + ")";
-        _chunkObjs.Add(chunkGameObject);
-    }
-
-    // Loads all chunkObjects in scene with the most recent meshes
     private void UpdateChunkObjects()
     {
         // Clear any excess chunks
@@ -158,6 +150,13 @@ public class LandscapeGenerator : MonoBehaviour
             int lastChunkInUseIndex = _landscapeData.ChunkData.Length - 1;
             for (int i = _chunkObjs.Count - 1; i > lastChunkInUseIndex; i--)
             {
+                // Free Old Mesh from memory
+                if (_chunkObject.GetComponent<MeshFilter>())
+                {
+                    Mesh mesh = _chunkObject.GetComponent<MeshFilter>().sharedMesh;
+                    Resources.UnloadAsset(mesh);
+                }
+
                 DestroyChunk(i);
             }
         }
@@ -175,6 +174,13 @@ public class LandscapeGenerator : MonoBehaviour
                     InstantiateChunkObject(xx, yy);
                 }
 
+                // Free Old Mesh from memory
+                if (_chunkObject.GetComponent<MeshFilter>())
+                {
+                    Mesh mesh = _chunkObject.GetComponent<MeshFilter>().sharedMesh;
+                    Resources.UnloadAsset(mesh);
+                }
+
                 ChunkData chunk = _landscapeData.ChunkData[xx, yy];
                 GameObject chunkObj = _chunkObjs[chunkObjIndex];
                 chunkObj.transform.position = chunk.pos;
@@ -182,20 +188,34 @@ public class LandscapeGenerator : MonoBehaviour
             }
         }
 
-       
+        //Resources.UnloadUnusedAssets();
     }
+
+    private void InstantiateChunkObject(int xx, int yy)
+    {
+        GameObject chunkGameObject = Instantiate(_chunkObject, Vector3.zero, Quaternion.identity, gameObject.transform);
+        chunkGameObject.name = "Chunk (" + xx + ", " + yy + ")";
+        _chunkObjs.Add(chunkGameObject);
+    }
+
+    // Loads all chunkObjects in scene with the most recent meshes
     
     private void DestroyChunk(int chunkIndex)
     {
         GameObject chunkObject = _chunkObjs[chunkIndex];
         _chunkObjs.RemoveAt(chunkIndex);
 
+        // Mesh must be explicitly Destroyed to free it from memory
+        Mesh mesh = chunkObject.GetComponent<MeshFilter>().sharedMesh;
+
         if (Application.isPlaying)
         {
+            Destroy(mesh);
             Destroy(chunkObject);
         }
         else
         {
+            DestroyImmediate(mesh);
             DestroyImmediate(chunkObject);
         }
     }
@@ -215,7 +235,7 @@ public class LandscapeGenerator : MonoBehaviour
 
         }
         _currentErosionIterations = _erosionIterations;
-        StartCoroutine(RunErosion());
+        //StartCoroutine(RunErosion());
     }
     private void GetScriptReferences()
     {
@@ -258,6 +278,20 @@ public class LandscapeGenerator : MonoBehaviour
             yield return new WaitForSeconds(_erosionTickTime);
         }
     }
+
+    private void Update()
+    {
+        if(_currentErosionIterations > 0)
+        {
+            _landscapeData = _erosion.ErosionPass(_landscapeData);
+
+            GenerateChunks();
+            LoadChunks();
+
+            _currentErosionIterations -= 1;
+        }
+    }
+
     private void OnDrawGizmos()
     {
         if (_debugPositions != null)

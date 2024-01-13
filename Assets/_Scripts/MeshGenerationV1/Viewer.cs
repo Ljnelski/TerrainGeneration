@@ -13,7 +13,7 @@ public class Viewer : MonoBehaviour
     private Vector3 _movementInput;
     private Vector3 _movement;
 
-
+    [SerializeField] InputActionAsset _actions;
 
     private void Start()
     {
@@ -36,9 +36,6 @@ public class Viewer : MonoBehaviour
     {
         _movement = Vector3.Lerp(_movement, _movementInput, _acceleration);
         transform.position += _movement * _speed * Time.deltaTime;
-
-
-
     }
 }
 

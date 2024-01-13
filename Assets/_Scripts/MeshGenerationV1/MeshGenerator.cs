@@ -6,12 +6,10 @@ public class MeshGenerator : MonoBehaviour
     // Y translates to Z world space
     public Mesh GenerateMesh(LandscapeData landscapeData, int heightMapCoordX, int heightMapCoordY)
     {
-        Mesh mesh = new Mesh();
-
         if (!landscapeData.HasMeshVertexParameters)
         {
             Debug.LogError("ERROR MeshGenerator: Does not have VertexDataParameters, which must be set in order to generate a mesh");
-            return mesh;
+            return new Mesh();
         }
 
         int meshSize = landscapeData.ChunkSizeX;
@@ -19,9 +17,6 @@ public class MeshGenerator : MonoBehaviour
 
         float meshBottomLeftX = (meshSize - 1) * landscapeData.VertexSpacing / -2f;
         float meshBottomLeftZ = (meshSize - 1) * landscapeData.VertexSpacing / -2f;
-
-        //Debug.Log("MeshBottomLeftX: " + meshBottomLeftX);
-        //Debug.Log("MeshBottomLeftZ: " + meshBottomLeftZ);
 
         int meshSimplifcationIncrement = Mathf.Max((landscapeData.MeshLOD) * 2, 1);
         int verticesPerLine = meshSize / meshSimplifcationIncrement + 1;
@@ -60,8 +55,6 @@ public class MeshGenerator : MonoBehaviour
                 }
 
             }
-            line += "]";
-            //Debug.Log(line);
         }
 
         // > generate vertices by looping through height and width
@@ -110,8 +103,6 @@ public class MeshGenerator : MonoBehaviour
                 // ACD
                 meshData.AddTriangle(indexA, indexC, indexD);
             }
-            line += "]";
-            //Debug.Log(line);
         }
 
         meshData.CalculateNormals();

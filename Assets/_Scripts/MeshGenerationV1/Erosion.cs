@@ -38,10 +38,15 @@ public class Erosion : MonoBehaviour
         _lastDropletTrails = new List<List<Vector3>>();
     }
 
+    // TODO -> Change Input output to Heightmap
     // Cell -> Refers the quad that the drop is located on, which is defined by four vertexs on the mesh
     public LandscapeData ErosionPass(LandscapeData landscapeData)
     {
-        _dropletBrush = CalculateBrush();
+
+        if(_dropletBrush.Cells == null)
+        {
+            _dropletBrush = CalculateBrush();
+        }
 
         if (rand == null)
         {
@@ -65,11 +70,11 @@ public class Erosion : MonoBehaviour
         for (int i = 0; i < _dropletIterations; i++)
         {
             // Intalize the Droplet
-                       
+
             int heightMapWidth = landscapeData.HeightMap.GetLength(0) - 1;
             // Intial Position
             int posX = rand.Next(0, heightMapWidth);
-            int posY = rand.Next(0, heightMapWidth);            
+            int posY = rand.Next(0, heightMapWidth);
 
             // Intail Direction
             int dirX = rand.Next(0, 1);
@@ -86,35 +91,16 @@ public class Erosion : MonoBehaviour
 
             for (int k = 0; k < _maxDropletLifetime; k++)
             {
-                //-----Gradient and Movement-----//
-
-                // coord is the position on the height map, so x index and y index
-                int coordX = (int)pos.x;
-                int coordY = (int)pos.y;                
+                //-----Gradient and Movement-----//       
 
                 // If the water droplet has zero water, velocity or direction, kill it.
-                if (speed < 0 || water <= 0)
-                {
-                    //Debug.Log("Droplet Terminated at interation: " + k + " because it has no velocity water");
-
-                    break;
-                }
-
-                float cellPosX = pos.x - coordX;
-                float cellPosY = pos.y - coordY;
+                if (speed < 0 || water <= 0) break;
 
                 float depositX = pos.x;
                 float depositY = pos.y;
 
-
                 Vector2 gradient = CalculateGradient(landscapeData.HeightMap, pos);
                 float height = CalculateHeight(landscapeData.HeightMap, pos);
-
-                // Record Droplet location for debug purposes
-                if (_drawRainDrops)
-                {
-                    _lastDropletTrails[i].Add(CalculateDropWorldSpace(landscapeData, cellPosX, cellPosY, coordX, coordY, height));
-                }
 
                 // Use the gradient to calculate the new direction
                 Vector2 dirNew = dir * _dropletInteria - new Vector2(gradient.x, gradient.y) * (1 - _dropletInteria);
@@ -129,14 +115,11 @@ public class Erosion : MonoBehaviour
                 float hNew = CalculateHeight(landscapeData.HeightMap, pos);
                 float hDif = hNew - height;
 
-                //Debug.Log(hDif);
-
                 // ------ Erosion And Deposition ------ //                
 
                 // If the height difference is positive the droplet when up a hill
                 if (hDif > 0)
                 {
-                    //Debug.Log("droplet went up a hill");
                     // Drop just the sediment needed to fill the hole
                     if (sediment > hDif)
                     {
@@ -153,7 +136,6 @@ public class Erosion : MonoBehaviour
                 }
                 else if (hDif < 0) // The droplet moves down the hill
                 {
-                    //Debug.Log("Droplet went down the hill");
                     float capacity = Mathf.Max(-hDif, _dropletMinSlope) * speed * water * _dropletCapacity;
 
                     // Deposit sediment if the droplet has space for less sediment
@@ -185,7 +167,6 @@ public class Erosion : MonoBehaviour
         return landscapeData;
     }
 
-
     Vector2 CalculateGradient(float[,] heightMap, Vector2 pos)
     {
         int coordX = (int)pos.x;
@@ -199,9 +180,6 @@ public class Erosion : MonoBehaviour
         float hpxy1 = heightMap[coordX, coordY + 1];
         float hpx1y1 = heightMap[coordX + 1, coordY + 1];
 
-        // og
-        //float gx = (hpx1y - hpxy) * (1 - cellPosY) + (hpx1y1 - hpxy1) * cellPosY;
-        //float gy = (hpxy1 - hpxy) * (1 - cellPosX) + (hpx1y1 - hpx1y) * cellPosX;
         float gx = (hpx1y - hpxy) * (1 - cellPosY) + (hpx1y1 - hpxy1) * cellPosY;
         float gy = (hpxy1 - hpxy) * (1 - cellPosX) + (hpx1y1 - hpx1y) * cellPosX;
 
@@ -284,17 +262,14 @@ public class Erosion : MonoBehaviour
 
                 // Calculate how much sediment is taken
                 float sedimentTaken = cell.weight * amount;
-                //Debug.Log(sedimentTaken);
-                //Debug.Log("Sediment before subtraction: " + heightMap[heightMapCoordX, heightMapCoordY]);
                 heightMap[heightMapCoordX, heightMapCoordY] -= sedimentTaken;
-                //Debug.Log("Sediment after subtraction: " + heightMap[heightMapCoordX, heightMapCoordY]);
 
 
                 totalSedimentTaken += sedimentTaken;
             }
         }
 
-        //Debug.Log("Total Sediment taken: " + totalSedimentTaken + ", vs amount calculated to be taken: " + amount);
+
         return heightMap;
     }
 
@@ -329,89 +304,50 @@ public class Erosion : MonoBehaviour
 
             brushCells = new BrushCell[brushHeight, brushWidth];
 
-            for (int brushYCoord = 0; brushYCoord <= _dropletErodeRadius; brushYCoord++)
+
+            for (int brushIndexY = 0; brushIndexY < brushHeight; brushIndexY++)
             {
-                for (int brushXCoord = 0; brushXCoord <= _dropletErodeRadius; brushXCoord++)
+                for (int brushIndexX = 0; brushIndexX < brushWidth; brushIndexX++)
                 {
-                    Vector2Int cellCoord;
+                    Vector2Int brushCellCoords = new Vector2Int(brushIndexX - _dropletErodeRadius + 1, brushIndexY - _dropletErodeRadius + 1);
 
-                    float posCentreX = brushXCoord;
-                    float posCentreY = brushYCoord;
+                    float maxDistance = _dropletErodeRadius - 0.5f;
 
-                    float inRadius = posCentreX * posCentreX + posCentreY * posCentreY - _dropletErodeRadius * _dropletErodeRadius;
+                    float dx = brushCentre.x - brushCellCoords.x;
+                    float dy = brushCentre.y - brushCellCoords.y;
 
-                    //Debug.Log("pos (" + brushXCoord + ", " + brushYCoord + ")" + " is " + inRadius);
-                    if (inRadius <= 1)
+                    float distance = MathF.Sqrt(dx * dx + dy * dy);
+                    float cellWeight = 0.0f;
+
+                    if (distance < maxDistance)
                     {
-                        BrushCell brushCell;
-
-                        cellCoord = new Vector2Int(brushXCoord, brushYCoord);
-                        brushCell = CreateBrushCell(cellCoord, brushCentre);
-
-                        brushCells[brushXCoord + wPosIndexOffset, brushYCoord + wPosIndexOffset] = brushCell;
-                        totalWeight += brushCell.weight;
-
-                        // Mirror just on X axis
-                        if (brushXCoord > 1)
-                        {
-                            cellCoord = new Vector2Int(-brushXCoord + 1, brushYCoord);
-                            brushCell = CreateBrushCell(cellCoord, brushCentre);
-
-                            brushCells[cellCoord.x + wPosIndexOffset, cellCoord.y + wPosIndexOffset] = brushCell;
-                            totalWeight += brushCell.weight;
-                        }
-                        // Mirror just on Y axis
-                        if (brushYCoord > 1)
-                        {
-                            cellCoord = new Vector2Int(brushXCoord, -brushYCoord + 1);
-                            brushCell = CreateBrushCell(cellCoord, brushCentre);
-
-                            brushCells[cellCoord.x + wPosIndexOffset, cellCoord.y + wPosIndexOffset] = brushCell;
-                            totalWeight += brushCell.weight;
-                        }
-                        // Mirror on X and Y axis
-                        if (brushXCoord > 1 && brushYCoord > 1)
-                        {
-                            cellCoord = new Vector2Int(-brushXCoord + 1, -brushYCoord + 1);
-                            brushCell = CreateBrushCell(cellCoord, brushCentre);
-
-                            brushCells[cellCoord.x + wPosIndexOffset, cellCoord.y + wPosIndexOffset] = brushCell;
-                            totalWeight += brushCell.weight;
-                        }
+                        cellWeight = 1 - distance / maxDistance;
                     }
+
+                    totalWeight += cellWeight;
+                    brushCells[brushIndexX, brushIndexY] = new BrushCell(brushCellCoords, cellWeight);
                 }
+
             }
         }
 
         float totalWeightNormalized = 0;
+        string line = "";
 
         // Normalize Weights
         for (int yy = 0; yy < brushCells.GetLength(0); yy++)
         {
             for (int xx = 0; xx < brushCells.GetLength(1); xx++)
             {
-                if (brushCells[xx, yy].weight > 0)
-                {
-                    brushCells[xx, yy].weight = brushCells[xx, yy].weight / totalWeight;
-                    totalWeightNormalized += brushCells[xx, yy].weight;
-                    //Debug.Log("");
-                    //Debug.Log("Brush Data Index: (" + xx + ", " + yy + ")");
-                    //Debug.Log("Cell Position: (" + brushCells[xx, yy].coord.x + ", " + brushCells[xx, yy].coord.y + ")");
-                    //Debug.Log("Cell Weight: (" + brushCells[xx, yy].weight + ")");
-                }
-
+                brushCells[xx, yy].weight = brushCells[xx, yy].weight / totalWeight;
+                totalWeightNormalized += brushCells[xx, yy].weight;
+                line += "{ W:" + String.Format("{0:.00}", brushCells[xx, yy].weight) + ", coord: (" + brushCells[xx, yy].coord + ") } ";
             }
+            line += "\n";
         }
-        //Debug.Log("Total Weight: " + totalWeight);
-        //Debug.Log("Total Weight Normalized: " + totalWeightNormalized);
+
 
         return new ErosionBrush(brushCells);
-    }
-
-    private BrushCell CreateBrushCell(Vector2Int cellCoord, Vector2 brushCentre)
-    {
-        float cellWeight = 1 - Vector2.Distance(brushCentre, new Vector2(cellCoord.x, -cellCoord.y + 1)) / _dropletErodeRadius;
-        return new BrushCell(cellCoord, cellWeight);
     }
 
     public void ClearRainDrops()
@@ -421,7 +357,7 @@ public class Erosion : MonoBehaviour
 
     // Takes the heights of the cell, and weighs them using the distance from the vector pos (0-1, 0-1) which is the position of the drop in the sell
     private Vector3 CalculateDropWorldSpace(LandscapeData landscapeData, float posX, float posY, int coordX, int coordY, float height)
-    {        
+    {
         Vector3 worldPos = landscapeData.HeightMapPositionToWorldSpace(coordX, coordY);
         worldPos.x += posX;
         worldPos.y = landscapeData.HeightMapValueToWorldSpace(height);
