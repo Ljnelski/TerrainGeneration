@@ -81,21 +81,19 @@ public class ChunkManager : MonoBehaviour
 
     public void UpdateChunkGameObjects()
     {
-        if(_chunkData == null || _chunkData.Length == 0)
-        {
-            Debug.LogError("ChunkManager ERROR: No ChunkData to create chunks from");
-            return;
-        }
-
-        if(_chunkObjs == null)
+        if (_chunkObjs == null)
         {
             _chunkObjs = new GameObject[_chunkData.GetLength(0), _chunkData.GetLength(1)];
         }
 
-        if(_chunkData.Length != _chunkObjs.Length)
+        if (_chunkData.Length != _chunkObjs.Length)
         {
+            Debug.Log("Resizing ChunkObjs");
             ResizeChunkObjs();
         }
+
+        Debug.Log("ChunkObjs Count: " + _chunkObjs.Length);
+        Debug.Log("ChunkData Counts: " + _chunkData.Length);
 
         // Update the chunks with 
         int worldWidth = _chunkData.GetLength(0);
@@ -134,32 +132,39 @@ public class ChunkManager : MonoBehaviour
 
     private void ResizeChunkObjs()
     {
-        // If there are more chunksObjs then ChunkData Entries, resize the chunkObjs array and delete the extra chunks
-        if (_chunkObjs.GetLength(0) > _chunkData.GetLength(0) || _chunkObjs.GetLength(1) > _chunkData.GetLength(0))
+        Debug.Log("Size Before: " + _chunkObjs.Length);
+
+        // Create new Array with new dimesions
+        GameObject[,] _chunksUpdatedSize = new GameObject[_chunkData.GetLength(0), _chunkData.GetLength(1)];
+
+        // Load Array with data while deleting excess data
+        for (int yy = 0; yy < _chunkObjs.GetLength(1); yy++)
         {
-            // Create new Array with new dimesions
-            GameObject[,] _chunksUpdatedSize = new GameObject[_chunkObjs.GetLength(0), _chunkObjs.GetLength(1)];
-
-            // Load Array with data while deleting excess data
-            for (int yy = 0; yy < _chunkObjs.GetLength(1); yy++)
+            for (int xx = 0; xx < _chunkObjs.GetLength(0); xx++)
             {
-                for (int xx = 0; xx < _chunkObjs.GetLength(0); xx++)
+                // If chunk is outside the array then delete it
+                if (xx > _chunkData.GetLength(0) - 1 || yy > _chunkData.GetLength(0) - 1)
                 {
-                    // If chunk is outside the array then delete it
-                    if (xx > _chunkData.GetLength(0) - 1 || yy > _chunkData.GetLength(0) - 1)
+                    // Free Old Mesh from memory
+                    if (_chunkObject.GetComponent<MeshFilter>())
                     {
-                        // Free Old Mesh from memory
-                        if (_chunkObject.GetComponent<MeshFilter>())
-                        {
-                            Mesh mesh = _chunkObject.GetComponent<MeshFilter>().sharedMesh;
-                            Resources.UnloadAsset(mesh);
-                        }
-
-                        DestroyChunk(xx, yy);
+                        Mesh mesh = _chunkObject.GetComponent<MeshFilter>().sharedMesh;
+                        Resources.UnloadAsset(mesh);
                     }
+
+                    DestroyChunk(xx, yy);
+                } 
+                else // load chunk into new temp array
+                {
+                    _chunksUpdatedSize[xx, yy] = _chunkObjs[xx, yy];
                 }
+
             }
         }
+
+        _chunkObjs = _chunksUpdatedSize;
+        Debug.Log("Size After: " + _chunkObjs.Length);
+
     }
 
     // Loads all chunkObjects in scene with the most recent meshes
