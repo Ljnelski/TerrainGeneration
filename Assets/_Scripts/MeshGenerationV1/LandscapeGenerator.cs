@@ -7,27 +7,30 @@ using UnityEngine;
 
 public class LandscapeGenerator : MonoBehaviour
 {
+    // These are not really in use right now but I don't want to delete because I am not 100% sure
     [SerializeField] private TextureGenerator _textureGenerator;
     [SerializeField] private TextureDisplay _textureDisplay;
-    [SerializeField] private MeshGenerator _meshGenerator;
+
+    // Generates the Mesh
+    [SerializeField] private PlaneMeshGenerator _meshGenerator;
+
+    // Heightmap Modifiers
     [SerializeField] private Noise _noise;
     [SerializeField] private Gradient _gradient;
     [SerializeField] private Erosion _erosion;
 
+    // Misc
+    [SerializeField] private ChunkManager _chunkManager;
+
     // > Unity uses Y axis for height, so Y Axis is translated to the Z access when 
     // Generating points
-
-    [SerializeField] private GameObject _chunkObject;
 
     [Header("LandscapeOptions")]
     [SerializeField] private int _worldSize; // number of chuncks to render
 
     [Header("Mesh Options")]
-    const int _vertexCountX = 241; // Each chunckX is this big
-    const int _vertexCountY = 241; // Each chunckY is this big
-    [SerializeField] private float _vertexSpacing = 1f;
-    [SerializeField] private float _maxHeight = 1f;
-    [SerializeField] private float _minHeight = 0f;
+    const int _vertexCountX = 240; // Each chunckX is this big
+    const int _vertexCountY = 240; // Each chunckY is this big
     [Range(0, 6)]
     [SerializeField] private int _meshLOD = 0;
 
@@ -44,16 +47,15 @@ public class LandscapeGenerator : MonoBehaviour
 
     [Header("Debug")]
     [SerializeField] private GameObject _debugFlag;
-    private LandscapeData _landscapeData;
+    //private LandscapeData _landscapeData;
     private List<Vector3> _debugPositions;
 
-    private List<GameObject> _chunkObjs;
     private float _currentErosionIterations;
 
     // Start is called before the first frame update
     void Awake()
     {
-        _meshGenerator = GetComponent<MeshGenerator>();
+        _meshGenerator = GetComponent<PlaneMeshGenerator>();
         _noise = GetComponent<Noise>();
         _gradient = GetComponent<Gradient>();
         GenerateTerrain();
@@ -70,16 +72,13 @@ public class LandscapeGenerator : MonoBehaviour
 
         float[,] heightMapData;
 
-        _landscapeData = new LandscapeData();
-        _landscapeData.SetWorldParameters(_worldSize, _vertexCountX, _vertexCountY, _meshLOD, _vertexSpacing, _maxHeight, _minHeight);
-        //heightMapData = _gradient.Generate(_vertexCountX * _worldSize, _vertexCountY * _worldSize);
-        int heightMapSize = (_vertexCountX * _worldSize) + 2;
+        heightMapData = _gradient.Generate(_vertexCountX * _worldSize, _vertexCountY * _worldSize);
+        int heightMapSize = (_vertexCountX * _worldSize) + 2; // ADD two for edge vertices
 
         heightMapData = _noise.Generate(heightMapSize, heightMapSize);
-        _landscapeData.SetHeightMapData(heightMapData);
+        //_landscapeData.SetHeightMapData(heightMapData);
 
-        GenerateChunks();
-        LoadChunks();
+        GenerateChunks(heightMapData);
 
         if (_generateTexture)
         {
@@ -91,133 +90,48 @@ public class LandscapeGenerator : MonoBehaviour
             _textureGenerator.SaveTexture(heightMapData);
         }
     }
-
-    private void GenerateChunks()
+    private void GenerateChunks(float[,] heightMap)
     {
-        _landscapeData.SetWorldParameters(_worldSize, _vertexCountX, _vertexCountY, _meshLOD, _vertexSpacing, _maxHeight, _minHeight);
+        ChunkData[,] chunkData = new ChunkData[_worldSize, _worldSize];
 
-        for (int chunkY = 0; chunkY < _worldSize; chunkY++)
+        for (int chunkIndexY = 0; chunkIndexY < _worldSize; chunkIndexY++)
         {
-            for (int chunkX = 0; chunkX < _worldSize; chunkX++)
+            for (int chunkIndexX = 0; chunkIndexX < _worldSize; chunkIndexX++)
             {
                 // Calculate the location where the chunck will be place in world space (current Set up is centre origin)               
-                float chunkSize = (_vertexCountX - 1) * _vertexSpacing;
+                float chunkSize = (_vertexCountX - 1) * _meshGenerator.VertexSpacing;
 
-                float chunkPosX = _landscapeData.BottomLeftX + chunkX * chunkSize + chunkSize / 2;
-                float chunkPosZ = _landscapeData.BottomLeftZ + chunkY * chunkSize + chunkSize / 2;
+                float chunkBottomLeftX = _worldSize * chunkSize / -2f;
+                float chunkBottomLeftZ = _worldSize * chunkSize / -2f;
+
+                float chunkPosX = chunkBottomLeftX + chunkIndexX * chunkSize + chunkSize / 2;
+                float chunkPosZ = chunkBottomLeftZ + chunkIndexY * chunkSize + chunkSize / 2;
 
                 Vector3 chunkPos = new Vector3(chunkPosX, 0f, chunkPosZ);
 
-                // The coordinates of the chunks origin on the height map
-                int chunkCoordX = chunkX * (_landscapeData.ChunkSizeX - 1);
-                int chunkCoordY = chunkY * (_landscapeData.ChunkSizeY - 1);
+                int sampleIndexStartX = chunkIndexX * (_vertexCountX - 1);
+                int sampleIndexStartY = chunkIndexY * (_vertexCountY - 1);
 
-                Mesh chunkMesh = _meshGenerator.GenerateMesh(_landscapeData, chunkCoordX, chunkCoordY);
+                float[,] heightMapSection = new float[_vertexCountX + 2, _vertexCountY + 2];
 
-                ChunkData chunk = new ChunkData(chunkPos, chunkMesh);
-
-                _landscapeData.SetChuck(chunkX, chunkY, chunk);
-            }
-        }
-    }
-
-    public void LoadChunks()
-    {
-        GetChunkObjectsFromScene();
-
-        UpdateChunkObjects();
-    }
-
-    // Gets a Reference to all existing chunk gameObjects in scene
-    public void GetChunkObjectsFromScene()
-    {
-        _chunkObjs = new List<GameObject>();
-
-        Transform[] chunkObjects = gameObject.transform.GetComponentsInChildren<Transform>();
-        for (var i = 0; i < chunkObjects.Length; i++)
-        {
-            if (chunkObjects[i] == gameObject.transform) continue;
-
-            _chunkObjs.Add(chunkObjects[i].gameObject);
-        }
-    }
-
-    private void UpdateChunkObjects()
-    {
-        // Clear any excess chunks
-        if (_chunkObjs.Count > _landscapeData.ChunkData.Length)
-        {
-            int lastChunkInUseIndex = _landscapeData.ChunkData.Length - 1;
-            for (int i = _chunkObjs.Count - 1; i > lastChunkInUseIndex; i--)
-            {
-                // Free Old Mesh from memory
-                if (_chunkObject.GetComponent<MeshFilter>())
+                // Take Section of the heightmap and convert it to a chunk
+                for (int yy = 0; yy < heightMapSection.GetLength(1); yy++)
                 {
-                    Mesh mesh = _chunkObject.GetComponent<MeshFilter>().sharedMesh;
-                    Resources.UnloadAsset(mesh);
+                    for (int xx = 0; xx < heightMapSection.GetLength(0); xx++)
+                    {
+                        int sampleIndexX = sampleIndexStartX + xx;
+                        int sampleIndexY = sampleIndexStartY + yy;
+
+                        heightMapSection[xx, yy] = heightMap[sampleIndexX, sampleIndexY];
+                    }
                 }
 
-                DestroyChunk(i);
+                Mesh chunkMesh = _meshGenerator.GenerateFromHeightMap(heightMapSection);
+                chunkData[chunkIndexX, chunkIndexY] = new ChunkData(chunkPos, chunkMesh);
             }
         }
 
-        // Update the chunks with 
-        int worldWidth = _landscapeData.ChunkData.GetLength(0);
-        for (int yy = 0; yy < _landscapeData.ChunkData.GetLength(1); yy++)
-        {
-            for (int xx = 0; xx < worldWidth; xx++)
-            {
-                int chunkObjIndex = xx + yy * worldWidth;
-
-                if (chunkObjIndex > _chunkObjs.Count - 1)
-                {
-                    InstantiateChunkObject(xx, yy);
-                }
-
-                // Free Old Mesh from memory
-                if (_chunkObject.GetComponent<MeshFilter>())
-                {
-                    Mesh mesh = _chunkObject.GetComponent<MeshFilter>().sharedMesh;
-                    Resources.UnloadAsset(mesh);
-                }
-
-                ChunkData chunk = _landscapeData.ChunkData[xx, yy];
-                GameObject chunkObj = _chunkObjs[chunkObjIndex];
-                chunkObj.transform.position = chunk.pos;
-                chunkObj.GetComponent<MeshFilter>().sharedMesh = chunk.mesh;
-            }
-        }
-
-        //Resources.UnloadUnusedAssets();
-    }
-
-    private void InstantiateChunkObject(int xx, int yy)
-    {
-        GameObject chunkGameObject = Instantiate(_chunkObject, Vector3.zero, Quaternion.identity, gameObject.transform);
-        chunkGameObject.name = "Chunk (" + xx + ", " + yy + ")";
-        _chunkObjs.Add(chunkGameObject);
-    }
-
-    // Loads all chunkObjects in scene with the most recent meshes
-    
-    private void DestroyChunk(int chunkIndex)
-    {
-        GameObject chunkObject = _chunkObjs[chunkIndex];
-        _chunkObjs.RemoveAt(chunkIndex);
-
-        // Mesh must be explicitly Destroyed to free it from memory
-        Mesh mesh = chunkObject.GetComponent<MeshFilter>().sharedMesh;
-
-        if (Application.isPlaying)
-        {
-            Destroy(mesh);
-            Destroy(chunkObject);
-        }
-        else
-        {
-            DestroyImmediate(mesh);
-            DestroyImmediate(chunkObject);
-        }
+        _chunkManager.LoadChunks(chunkData);
     }
 
     public void UpdateTexture(float[,] heightMapData)
@@ -239,6 +153,11 @@ public class LandscapeGenerator : MonoBehaviour
     }
     private void GetScriptReferences()
     {
+        if (_chunkManager == null)
+        {
+            _chunkManager = GetComponent<ChunkManager>();
+        }
+
         if (_textureGenerator == null)
         {
             _textureGenerator = GetComponent<TextureGenerator>();
@@ -251,7 +170,7 @@ public class LandscapeGenerator : MonoBehaviour
 
         if (_meshGenerator == null)
         {
-            _meshGenerator = gameObject.GetComponent<MeshGenerator>();
+            _meshGenerator = gameObject.GetComponent<PlaneMeshGenerator>();
         }
 
         if (_noise == null)
@@ -266,12 +185,13 @@ public class LandscapeGenerator : MonoBehaviour
     }
     private IEnumerator RunErosion()
     {
+        // TODO Fix Erosion with Removal of landscapeData
         while (_currentErosionIterations > 0)
         {
-            _landscapeData = _erosion.ErosionPass(_landscapeData);
+            //_landscapeData = _erosion.ErosionPass(_landscapeData);
 
-            GenerateChunks();
-            LoadChunks();
+            //GenerateChunks();
+            //_chunkManager.LoadChunks();
 
             _currentErosionIterations -= 1;
 
@@ -279,14 +199,15 @@ public class LandscapeGenerator : MonoBehaviour
         }
     }
 
+    // TODO Fix the Erosion with the new system
     private void Update()
     {
-        if(_currentErosionIterations > 0)
+        if (_currentErosionIterations > 0)
         {
-            _landscapeData = _erosion.ErosionPass(_landscapeData);
+            //_landscapeData = _erosion.ErosionPass(_landscapeData);
 
-            GenerateChunks();
-            LoadChunks();
+            //GenerateChunks();
+            //_chunkManager.LoadChunks();
 
             _currentErosionIterations -= 1;
         }
