@@ -1,0 +1,6 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xsi="http://www.w3.org/2001/XMLSchema-instance" engine="UnityEngine.UIElements" editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="True">
+    <uie:PropertyField name="_floatData1" binding-path="_floatData1" />
+    <uie:PropertyField name="_floatData2" binding-path="_floatData2" />
+    <uie:PropertyField name="_stringData1" binding-path="_stringData1" />
+    <uie:PropertyField name="_intData1" binding-path="_intData1" focusable="false" />
+</ui:UXML>

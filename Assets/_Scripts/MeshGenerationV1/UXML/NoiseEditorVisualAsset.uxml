@@ -1,0 +1,18 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xsi="http://www.w3.org/2001/XMLSchema-instance" engine="UnityEngine.UIElements" editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="True">
+    <Style src="project://database/Assets/_Scripts/MeshGenerationV1/UXML/GeneratedTextureEditorStyle.uss?fileID=7433441132597879392&amp;guid=87658418a8edbf34dbdff15c3cb64372&amp;type=3#GeneratedTextureEditorStyle" />
+    <ui:VisualElement name="SectionTransform">
+        <ui:VisualElement name="Header" class="header_group" style="flex-grow: 1;">
+            <ui:Label tabindex="-1" text="Options" parse-escape-sequences="true" display-tooltip-when-elided="true" class="header-label" />
+        </ui:VisualElement>
+        <ui:VisualElement name="Vars" style="flex-grow: 1;">
+            <uie:PropertyField name="_offsetX" binding-path="_offsetX" />
+            <uie:PropertyField name="_offsetY" binding-path="_offsetY" />
+            <uie:PropertyField name="_scale" binding-path="_scale" />
+            <uie:PropertyField name="_octaves" binding-path="_octaves" />
+            <uie:PropertyField name="_lacunarity" binding-path="_lacunarity" />
+            <uie:PropertyField binding-path="_persistance" name="_persistance" />
+            <uie:PropertyField name="_seed" binding-path="_seed" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+    <ui:VisualElement name="SectionOptions" />
+</ui:UXML>

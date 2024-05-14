@@ -1,3 +1,4 @@
+using System;
 using System.CodeDom.Compiler;
 using System.Collections;
 using System.Collections.Generic;
@@ -5,9 +6,9 @@ using Unity.Mathematics;
 using Unity.VisualScripting;
 using UnityEngine;
 
+[Serializable]
 public class Noise : GeneratedTexture
 {
-    [Header("Settings")]
     [SerializeField] private float _offsetX;
     [SerializeField] private float _offsetY;
 
@@ -72,7 +73,7 @@ public class Noise : GeneratedTexture
                     amplitude *= _persistance;
                 }
 
-                heightMap[xx, yy] += heightValue * _textureAmplitude;
+                heightMap[xx, yy] += heightValue * _drawStrength;
             }
         }
 

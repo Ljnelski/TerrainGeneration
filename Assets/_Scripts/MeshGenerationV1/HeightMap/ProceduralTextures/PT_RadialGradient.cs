@@ -1,22 +1,21 @@
 using System.Collections;
 using System.Collections.Generic;
-using Unity.VisualScripting;
 using UnityEngine;
 
-public class Gradient : GeneratedTexture
+public class PT_RadialGradient : BaseProceduralTexture
 {
-
-    [Header("Settings")]
     [SerializeField] private float _offsetX;
     [SerializeField] private float _offsetY;
     [SerializeField] private float _radius;
     [SerializeField] private AnimationCurve _gradientCurve;
 
+    public override string InspectorName => "Radial Gradient";
+
     public override float[,] Generate(int width, int height)
     {
         float[,] gradient = new float[width, height];
 
-        return Generate(gradient);        
+        return Generate(gradient);
     }
 
     // Applys a Circular Gradient to a height Map
@@ -39,7 +38,7 @@ public class Gradient : GeneratedTexture
 
                 float value = Mathf.Min(Mathf.Max(curveValue, 0), 1) * 2 - 1f;
 
-                heightMap[xx, yy] =+ value * _textureAmplitude;
+                heightMap[xx, yy] = +value * _drawStrength;
             }
         }
 

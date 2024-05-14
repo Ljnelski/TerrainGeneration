@@ -1,0 +1,7 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xsi="http://www.w3.org/2001/XMLSchema-instance" engine="UnityEngine.UIElements" editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="True">
+    <Style src="project://database/Assets/_Scripts/MeshGenerationV1/UXML/GeneratedTextureEditorStyle.uss?fileID=7433441132597879392&amp;guid=87658418a8edbf34dbdff15c3cb64372&amp;type=3#GeneratedTextureEditorStyle" />
+    <ui:VisualElement name="Error" class="section header_group" style="flex-grow: 1; -unity-text-align: upper-left; align-items: center;">
+        <ui:Label tabindex="-1" text="ERROR" parse-escape-sequences="true" display-tooltip-when-elided="true" name="Label" style="font-size: 35px; -unity-text-align: upper-left;" />
+        <ui:Label tabindex="-1" text="Could not load Visual Tree Asset" parse-escape-sequences="true" display-tooltip-when-elided="true" />
+    </ui:VisualElement>
+</ui:UXML>
