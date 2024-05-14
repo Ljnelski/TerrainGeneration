@@ -10,6 +10,8 @@ public partial class HeightMapGenerator : MonoBehaviour
 
     public List<GeneratedTexture> GeneratedTextures => _generatedTextures;
     public List<BaseProceduralTexture> ProceduralTextures => _proceduralTextures;
+    
+    
 
     private void CreateProceduralTexture(ProceduralTextureType type)
     {

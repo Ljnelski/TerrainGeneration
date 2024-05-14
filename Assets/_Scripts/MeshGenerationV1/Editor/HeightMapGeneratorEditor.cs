@@ -12,53 +12,35 @@ public class HeightMapGeneratorEditor : Editor
 {
     private HeightMapGenerator _heightMapGenerator;
 
-    private VisualElement[] _generatedTextureVisualElements;
-    private VisualElement[] _proceduralTextureVisualElements;
-
     private VisualTreeAsset _editorVisualTreeAsset;
 
     private const string UXML_FOLDER_PATH = "Assets/_Scripts/MeshGenerationV1/UXML/";
     private const string UXML_EDITOR_VISUAL_TREE_ASSET_NAME = "HeightMapGeneratorEditorVisualTree.uxml";
 
+    // Bind to the length of _proceduralTexture list
+
+    // Refresh the list when the value changes
+
+
     private void OnEnable()
     {
         _heightMapGenerator = (HeightMapGenerator)target;
 
-        _editorVisualTreeAsset = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(UXML_FOLDER_PATH + UXML_EDITOR_VISUAL_TREE_ASSET_NAME);
-        //_generatedTextureVisualElements = new VisualElement[_heightMapGenerator.GeneratedTextures.Count];
-
-        //for (int i = 0; i < _generatedTextureVisualElements.Length; i++)
-        //{
-        //    _generatedTextureVisualElements[i] = Editor.CreateEditor(_heightMapGenerator.GeneratedTextures[i]).CreateInspectorGUI();
-
-        //    SerializedObject so = new SerializedObject(_heightMapGenerator.GeneratedTextures[i]);
-
-        //    _generatedTextureVisualElements[i].Bind(so);
-        //}        
-    }
-
-    private void BuildProceduralTextureEditors()
-    {
-        _heightMapGenerator = (HeightMapGenerator)target;
-        _proceduralTextureVisualElements = new VisualElement[_heightMapGenerator.ProceduralTextures.Count];
-
-        for (int i = 0; i < _heightMapGenerator.ProceduralTextures.Count; i++)
-        {
-            _proceduralTextureVisualElements[i] = CreateEditor(_heightMapGenerator.ProceduralTextures[i]).CreateInspectorGUI();
-
-            SerializedObject serializedProceduralTexture = new SerializedObject(_heightMapGenerator.ProceduralTextures[i]);
-
-            _proceduralTextureVisualElements[i].Bind(serializedProceduralTexture);
-        }
-    }
+        _editorVisualTreeAsset = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(UXML_FOLDER_PATH + UXML_EDITOR_VISUAL_TREE_ASSET_NAME);      
+    }    
 
     public override VisualElement CreateInspectorGUI()
     {
-        BuildProceduralTextureEditors();
-
         VisualElement root = new VisualElement();
-
         _editorVisualTreeAsset.CloneTree(root);
+
+        VisualElement proceduralTextureGroup = root.Q("Section2");
+        var proceduralTexturesCount = serializedObject.FindProperty("_proceduralTextures");
+
+        root.TrackPropertyValue(proceduralTexturesCount, (e) => {
+            Debug.Log("Count Changed");
+            DrawProceduralTextureEditors(proceduralTextureGroup);
+        });
 
         // Hookup add buttons
         var addNoiseButton = root.Q("AddNoiseButton");
@@ -71,9 +53,21 @@ public class HeightMapGeneratorEditor : Editor
             _heightMapGenerator.AddProcedurealTexture(ProceduralTextureType.PT_RadialGradient);
         });
 
-        for (int i = 0; i < _proceduralTextureVisualElements.Length; i++)
+        DrawProceduralTextureEditors(proceduralTextureGroup);
+        
+        return root;
+    }
+
+    public void DrawProceduralTextureEditors(VisualElement root)
+    {
+        // Clear the exising ones
+        root.Clear();
+
+        int length = _heightMapGenerator.ProceduralTextures.Count;
+        // Draw and hook up button logic to each Procedural Texture Editor
+        for (int i = 0; i < length; i++)
         {
-            var PT_EditorVisualElement = _proceduralTextureVisualElements[i];
+            var PT_EditorVisualElement = CreateAndBindProceduralTextureEditor(i);
             var PT_Script = _heightMapGenerator.ProceduralTextures[i];
 
             PT_Script.Assign(_heightMapGenerator, i);
@@ -99,24 +93,44 @@ public class HeightMapGeneratorEditor : Editor
                     PT_Script.MoveDownInOrder();
                 });
 
+
+                // Hide moveup button if first in list
                 if (i == 0)
                 {
                     moveUpButton.visible = false;
                 }
-                if (i == _proceduralTextureVisualElements.Length - 1)
+                
+                // Hide movedown button if last in list or only in list
+                if (i == length - 1 || length == 1)
                 {
                     moveDownButton.visible = false;
                 }
-
                 root.Add(PT_EditorVisualElement);
             }
         }
-
-        return root;
     }
 
-    private void RemoveProceduralTexture(int i)
+    private VisualElement CreateAndBindProceduralTextureEditor(int i)
     {
-        _heightMapGenerator.RemoveProceduralTexture(i);
+        VisualElement proceduralTextureEditorElement = CreateEditor(_heightMapGenerator.ProceduralTextures[i]).CreateInspectorGUI();
+        SerializedObject serializedProceduralTexture = new SerializedObject(_heightMapGenerator.ProceduralTextures[i]);
+        proceduralTextureEditorElement.Bind(serializedProceduralTexture);
+
+        return proceduralTextureEditorElement;
     }
+
+    //private void BuildProceduralTextureEditors()
+    //{
+    //    _proceduralTextureVisualElements = new VisualElement[_heightMapGenerator.ProceduralTextures.Count];
+
+    //    for (int i = 0; i < _heightMapGenerator.ProceduralTextures.Count; i++)
+    //    {
+    //        _proceduralTextureVisualElements[i] = CreateEditor(_heightMapGenerator.ProceduralTextures[i]).CreateInspectorGUI();
+
+    //        SerializedObject serializedProceduralTexture = new SerializedObject(_heightMapGenerator.ProceduralTextures[i]);
+
+    //        _proceduralTextureVisualElements[i].Bind(serializedProceduralTexture);
+    //    }
+    //}
+
 }
