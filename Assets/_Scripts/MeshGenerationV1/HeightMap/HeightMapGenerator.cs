@@ -3,7 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class HeightMapGenerator : MonoBehaviour
+public partial class HeightMapGenerator : MonoBehaviour
 {
     [SerializeField] private List<GeneratedTexture> _generatedTextures;
     [SerializeField] private List<BaseProceduralTexture> _proceduralTextures;
@@ -11,18 +11,27 @@ public class HeightMapGenerator : MonoBehaviour
     public List<GeneratedTexture> GeneratedTextures => _generatedTextures;
     public List<BaseProceduralTexture> ProceduralTextures => _proceduralTextures;
 
-    public enum ProceduralTextureType
+    private void CreateProceduralTexture(ProceduralTextureType type)
     {
-        PT_Noise,
-        PT_RadialGradient
+        switch (type)
+        {
+            case ProceduralTextureType.PT_Noise:
+                _proceduralTextures.Add((BaseProceduralTexture)PT_Noise.CreateInstance<PT_Noise>());
+                break;
+            case ProceduralTextureType.PT_RadialGradient:
+                _proceduralTextures.Add((PT_RadialGradient)PT_Noise.CreateInstance<PT_RadialGradient>());
+                break;
+            default:
+                break;
+        }
     }
 
     public void CreateTestProceduralTextures()
     {
         _proceduralTextures = new List<BaseProceduralTexture>();
 
-        _proceduralTextures.Add((BaseProceduralTexture)PT_Noise.CreateInstance<PT_Noise>());
-        _proceduralTextures.Add((PT_RadialGradient)PT_Noise.CreateInstance<PT_RadialGradient>());
+        CreateProceduralTexture(ProceduralTextureType.PT_Noise);
+        CreateProceduralTexture(ProceduralTextureType.PT_RadialGradient);
     }
 
     public float[,] GenerateHeightMap(int width, int height)
@@ -71,19 +80,17 @@ public class HeightMapGenerator : MonoBehaviour
 
     public void RemoveProceduralTexture(int index)
     {
-        Debug.LogAssertion("index: " + index);
-
         _proceduralTextures.RemoveAt(index);
     }
 
-    private void MoveProceduralTextureUp(int targetIndex)
-    {
-        SwapProceduralTexture(targetIndex, targetIndex + 1);
-    }
-
-    private void MoveProceduralTextureDown(int targetIndex)
+    public void MoveProceduralTextureUp(int targetIndex)
     {
         SwapProceduralTexture(targetIndex, targetIndex - 1);
+    }
+
+    public void MoveProceduralTextureDown(int targetIndex)
+    {
+        SwapProceduralTexture(targetIndex, targetIndex + 1);
     }
 
     private void SwapProceduralTexture(int indexFrom, int indexTo)

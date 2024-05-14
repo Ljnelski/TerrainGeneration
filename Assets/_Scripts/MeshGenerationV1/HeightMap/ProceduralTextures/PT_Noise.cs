@@ -23,6 +23,7 @@ public class PT_Noise : BaseProceduralTexture
     private Vector2[] octaveOffsets;
 
     public override string InspectorName => "Noise";
+    public override ProceduralTextureType ProceduralTextureType => ProceduralTextureType.PT_Noise;
 
     public override float[,] Generate(float[,] heightMap)
     {

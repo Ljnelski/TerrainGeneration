@@ -22,27 +22,23 @@ public class HeightMapGeneratorEditor : Editor
 
     private void OnEnable()
     {
-        _editorVisualTreeAsset = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(UXML_FOLDER_PATH + UXML_EDITOR_VISUAL_TREE_ASSET_NAME);
-
         _heightMapGenerator = (HeightMapGenerator)target;
-        _generatedTextureVisualElements = new VisualElement[_heightMapGenerator.GeneratedTextures.Count];
 
-        for (int i = 0; i < _generatedTextureVisualElements.Length; i++)
-        {
-            _generatedTextureVisualElements[i] = Editor.CreateEditor(_heightMapGenerator.GeneratedTextures[i]).CreateInspectorGUI();
+        _editorVisualTreeAsset = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(UXML_FOLDER_PATH + UXML_EDITOR_VISUAL_TREE_ASSET_NAME);
+        //_generatedTextureVisualElements = new VisualElement[_heightMapGenerator.GeneratedTextures.Count];
 
-            SerializedObject so = new SerializedObject(_heightMapGenerator.GeneratedTextures[i]);
+        //for (int i = 0; i < _generatedTextureVisualElements.Length; i++)
+        //{
+        //    _generatedTextureVisualElements[i] = Editor.CreateEditor(_heightMapGenerator.GeneratedTextures[i]).CreateInspectorGUI();
 
-            _generatedTextureVisualElements[i].Bind(so);
-        }
+        //    SerializedObject so = new SerializedObject(_heightMapGenerator.GeneratedTextures[i]);
 
-        BuildProceduralTextureEditors();
+        //    _generatedTextureVisualElements[i].Bind(so);
+        //}        
     }
 
     private void BuildProceduralTextureEditors()
     {
-        _heightMapGenerator.CreateTestProceduralTextures();
-
         _heightMapGenerator = (HeightMapGenerator)target;
         _proceduralTextureVisualElements = new VisualElement[_heightMapGenerator.ProceduralTextures.Count];
 
@@ -58,36 +54,59 @@ public class HeightMapGeneratorEditor : Editor
 
     public override VisualElement CreateInspectorGUI()
     {
+        BuildProceduralTextureEditors();
+
         VisualElement root = new VisualElement();
 
         _editorVisualTreeAsset.CloneTree(root);
 
         // Hookup add buttons
-        var addNoise = root.Q("AddNoiseButton");
-        var addRadialGradient = root.Q("AddRadialGradientButton");
-        
+        var addNoiseButton = root.Q("AddNoiseButton");
+        addNoiseButton.RegisterCallback<ClickEvent>((ClickEvent) => {
+            _heightMapGenerator.AddProcedurealTexture(ProceduralTextureType.PT_Noise);
+        });
+
+        var addRadialGradientButton = root.Q("AddRadialGradientButton");
+        addRadialGradientButton.RegisterCallback<ClickEvent>((ClickEvent) => {
+            _heightMapGenerator.AddProcedurealTexture(ProceduralTextureType.PT_RadialGradient);
+        });
+
         for (int i = 0; i < _proceduralTextureVisualElements.Length; i++)
         {
             var PT_EditorVisualElement = _proceduralTextureVisualElements[i];
+            var PT_Script = _heightMapGenerator.ProceduralTextures[i];
+
+            PT_Script.Assign(_heightMapGenerator, i);
+
             if (PT_EditorVisualElement != null)
             {
-                if (i == 0)
-                {
-                    PT_EditorVisualElement.Q("UpButton").visible = false;
-                }
-                if (i == _proceduralTextureVisualElements.Length - 1)
-                {
-                    PT_EditorVisualElement.Q("DownButton").visible = false;
-                }
-
                 var contentFoldOut = PT_EditorVisualElement.Q<Foldout>("Foldout");
                 contentFoldOut.text = _heightMapGenerator.ProceduralTextures[i].InspectorName;
                 contentFoldOut.Q<Label>().AddToClassList("header-label");
 
                 var removeButton = PT_EditorVisualElement.Q<Button>("RemoveButton");
                 removeButton.RegisterCallback<ClickEvent>((clickEvent) => {
-                    RemoveProceduralTexture(i);
+                    PT_Script.RemoveFromHeightMapGeneration();
                 });
+
+                var moveUpButton = PT_EditorVisualElement.Q<Button>("MoveUpButton");
+                moveUpButton.RegisterCallback<ClickEvent>((clickEvent) => {
+                    PT_Script.MoveUpInOrder();
+                });
+
+                var moveDownButton = PT_EditorVisualElement.Q<Button>("MoveDownButton");
+                moveDownButton.RegisterCallback<ClickEvent>((ClickEvent) => {
+                    PT_Script.MoveDownInOrder();
+                });
+
+                if (i == 0)
+                {
+                    moveUpButton.visible = false;
+                }
+                if (i == _proceduralTextureVisualElements.Length - 1)
+                {
+                    moveDownButton.visible = false;
+                }
 
                 root.Add(PT_EditorVisualElement);
             }
@@ -99,5 +118,5 @@ public class HeightMapGeneratorEditor : Editor
     private void RemoveProceduralTexture(int i)
     {
         _heightMapGenerator.RemoveProceduralTexture(i);
-    }    
+    }
 }

@@ -10,6 +10,7 @@ public class PT_RadialGradient : BaseProceduralTexture
     [SerializeField] private AnimationCurve _gradientCurve;
 
     public override string InspectorName => "Radial Gradient";
+    public override ProceduralTextureType ProceduralTextureType => ProceduralTextureType.PT_RadialGradient;
 
     public override float[,] Generate(int width, int height)
     {

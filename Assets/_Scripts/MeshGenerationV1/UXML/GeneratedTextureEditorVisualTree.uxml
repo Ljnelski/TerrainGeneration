@@ -19,8 +19,8 @@
                 <ui:VisualElement name="derivedClass" style="flex-grow: 1;" />
             </ui:VisualElement>
             <ui:VisualElement name="ButtonGroup" class="button_group sub-section">
-                <ui:Button text="Move Up" parse-escape-sequences="true" display-tooltip-when-elided="true" name="UpButton" class="button" />
-                <ui:Button text="Move Down" parse-escape-sequences="true" display-tooltip-when-elided="true" name="DownButton" class="button" style="-unity-text-align: middle-center;" />
+                <ui:Button text="Move Up" parse-escape-sequences="true" display-tooltip-when-elided="true" name="MoveUpButton" class="button" />
+                <ui:Button text="Move Down" parse-escape-sequences="true" display-tooltip-when-elided="true" name="MoveDownButton" class="button" style="-unity-text-align: middle-center;" />
                 <ui:Button text="Remove" parse-escape-sequences="true" display-tooltip-when-elided="true" name="RemoveButton" class="button" />
             </ui:VisualElement>
         </ui:VisualElement>
