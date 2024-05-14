@@ -34,12 +34,13 @@ public class HeightMapGeneratorEditor : Editor
         VisualElement root = new VisualElement();
         _editorVisualTreeAsset.CloneTree(root);
 
-        VisualElement proceduralTextureGroup = root.Q("Section2");
-        var proceduralTexturesCount = serializedObject.FindProperty("_proceduralTextures");
+        VisualElement proceduralTextureElement = root.Q("Section2");
+
+        // get the serialized property storing the length of the procedural textures and bind drawing the procedural textures to it
+        SerializedProperty proceduralTexturesCount = serializedObject.FindProperty("_proceduralTextures");
 
         root.TrackPropertyValue(proceduralTexturesCount, (e) => {
-            Debug.Log("Count Changed");
-            DrawProceduralTextureEditors(proceduralTextureGroup);
+            DrawProceduralTextureEditors(proceduralTextureElement);
         });
 
         // Hookup add buttons
@@ -53,15 +54,15 @@ public class HeightMapGeneratorEditor : Editor
             _heightMapGenerator.AddProcedurealTexture(ProceduralTextureType.PT_RadialGradient);
         });
 
-        DrawProceduralTextureEditors(proceduralTextureGroup);
+        DrawProceduralTextureEditors(proceduralTextureElement);
         
         return root;
     }
 
-    public void DrawProceduralTextureEditors(VisualElement root)
+    public void DrawProceduralTextureEditors(VisualElement element)
     {
         // Clear the exising ones
-        root.Clear();
+        element.Clear();
 
         int length = _heightMapGenerator.ProceduralTextures.Count;
         // Draw and hook up button logic to each Procedural Texture Editor
@@ -105,7 +106,7 @@ public class HeightMapGeneratorEditor : Editor
                 {
                     moveDownButton.visible = false;
                 }
-                root.Add(PT_EditorVisualElement);
+                element.Add(PT_EditorVisualElement);
             }
         }
     }
@@ -118,19 +119,4 @@ public class HeightMapGeneratorEditor : Editor
 
         return proceduralTextureEditorElement;
     }
-
-    //private void BuildProceduralTextureEditors()
-    //{
-    //    _proceduralTextureVisualElements = new VisualElement[_heightMapGenerator.ProceduralTextures.Count];
-
-    //    for (int i = 0; i < _heightMapGenerator.ProceduralTextures.Count; i++)
-    //    {
-    //        _proceduralTextureVisualElements[i] = CreateEditor(_heightMapGenerator.ProceduralTextures[i]).CreateInspectorGUI();
-
-    //        SerializedObject serializedProceduralTexture = new SerializedObject(_heightMapGenerator.ProceduralTextures[i]);
-
-    //        _proceduralTextureVisualElements[i].Bind(serializedProceduralTexture);
-    //    }
-    //}
-
 }
