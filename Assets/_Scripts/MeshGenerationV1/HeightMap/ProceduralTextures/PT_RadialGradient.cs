@@ -39,12 +39,10 @@ public class PT_RadialGradient : BaseProceduralTexture
 
                 float value = Mathf.Min(Mathf.Max(curveValue, 0), 1) * 2 - 1f;
 
-                heightMap[xx, yy] = +value * _drawStrength;
+                DrawOnHeightMap(heightMap, xx, yy, value);
             }
         }
 
         return heightMap;
-
-        throw new System.NotImplementedException();
     }
 }

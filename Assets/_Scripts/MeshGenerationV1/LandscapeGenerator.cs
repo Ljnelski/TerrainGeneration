@@ -12,9 +12,8 @@ public class LandscapeGenerator : MonoBehaviour
     // Generates the Mesh
     [SerializeField] private PlaneMeshGenerator _meshGenerator;
 
-    // Heightmap Modifiers
-    [SerializeField] private Noise _noise;
-    [SerializeField] private Gradient _gradient;
+    // Heightmap 
+    [SerializeField] private HeightMapGenerator _heightMapGenerator;
     [SerializeField] private Erosion _erosion;
 
     // Misc
@@ -54,8 +53,7 @@ public class LandscapeGenerator : MonoBehaviour
     void Awake()
     {
         _meshGenerator = GetComponent<PlaneMeshGenerator>();
-        _noise = GetComponent<Noise>();
-        _gradient = GetComponent<Gradient>();
+        _heightMapGenerator = GetComponent<HeightMapGenerator>();
         GenerateTerrain();
     }
 
@@ -70,11 +68,7 @@ public class LandscapeGenerator : MonoBehaviour
 
         float[,] heightMapData;
 
-        heightMapData = _gradient.Generate(_vertexCountX * _worldSize, _vertexCountY * _worldSize);
-        int heightMapSize = (_vertexCountX * _worldSize) + 2; // ADD two for edge vertices
-
-        heightMapData = _noise.Generate(heightMapSize, heightMapSize);
-        //_landscapeData.SetHeightMapData(heightMapData);
+        heightMapData = _heightMapGenerator.GenerateHeightMap(_vertexCountX * _worldSize + 2, _vertexCountY * _worldSize + 2);
 
         GenerateChunks(heightMapData);
 
@@ -171,14 +165,9 @@ public class LandscapeGenerator : MonoBehaviour
             _meshGenerator = gameObject.GetComponent<PlaneMeshGenerator>();
         }
 
-        if (_noise == null)
+        if(_heightMapGenerator == null)
         {
-            _noise = gameObject.GetComponent<Noise>();
-        }
-
-        if (_gradient == null)
-        {
-            _gradient = gameObject.GetComponent<Gradient>();
+            _heightMapGenerator = gameObject.GetComponent<HeightMapGenerator>();
         }
     }
     private IEnumerator RunErosion()

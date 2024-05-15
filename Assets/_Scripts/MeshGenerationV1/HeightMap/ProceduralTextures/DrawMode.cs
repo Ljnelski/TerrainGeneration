@@ -3,5 +3,7 @@
     Mix,
     Add,
     Subtract,
+    Multiply,
+    Draw
 }
 

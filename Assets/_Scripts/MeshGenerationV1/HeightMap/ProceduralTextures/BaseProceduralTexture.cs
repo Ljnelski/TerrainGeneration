@@ -39,6 +39,30 @@ public abstract class BaseProceduralTexture : ScriptableObject
         _index = index;
     }
 
+    protected void DrawOnHeightMap(float[,] heightMap, int x, int y, float value)
+    {
+        switch (_drawMode)
+        {
+            case DrawMode.Mix:
+                heightMap[x,y] = Mathf.Lerp(heightMap[x,y], value, _drawStrength);
+                break;
+            case DrawMode.Add:
+                heightMap[x,y] = heightMap[x,y] + value * _drawStrength;
+                break;
+            case DrawMode.Subtract:
+                heightMap[x,y] = heightMap[x,y] - value * _drawStrength;
+                break;
+            case DrawMode.Multiply:
+                heightMap[x, y] = heightMap[x, y] * (value * _drawStrength);
+                break;
+            case DrawMode.Draw:
+                heightMap[x, y] = value * _drawStrength;
+                break;
+            default:
+                break;
+        }
+    }
+
     public void RemoveFromHeightMapGeneration()
     {
         _parent.RemoveProceduralTexture(_index);

@@ -65,7 +65,7 @@ public class PT_Noise : BaseProceduralTexture
                     amplitude *= _persistance;
                 }
 
-                heightMap[xx, yy] += heightValue * _drawStrength;
+                DrawOnHeightMap(heightMap, xx, yy , heightValue);
             }
         }
 
