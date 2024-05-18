@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Profiling;
 
 public class LandscapeGenerator : MonoBehaviour
 {
@@ -26,8 +27,8 @@ public class LandscapeGenerator : MonoBehaviour
     [SerializeField] private int _worldSize; // number of chuncks to render
 
     [Header("Mesh Options")]
-    const int _vertexCountX = 240; // Each chunckX is this big
-    const int _vertexCountY = 240; // Each chunckY is this big
+    const int _meshSizeX = 240; // # of squares in mesh along X
+    const int _meshSizeY = 240; // # of squares in mesh along Y
     [Range(0, 6)]
     [SerializeField] private int _meshLOD = 0;
 
@@ -49,6 +50,17 @@ public class LandscapeGenerator : MonoBehaviour
 
     private float _currentErosionIterations;
 
+    private int MeshVertexCountX => _meshSizeX + 1;
+    private int MeshVertexCountY => _meshSizeY + 1;
+
+    private int BorderedMeshVertexCountX => MeshVertexCountX + BORDER_VERTEX_COUNT;
+    private int BorderedMeshVertexCountY=> MeshVertexCountY + BORDER_VERTEX_COUNT;
+
+    private int HeightMapSizeX => MeshVertexCountX * _worldSize + BORDER_VERTEX_COUNT;
+    private int HeightMapSizeY => MeshVertexCountY * _worldSize + BORDER_VERTEX_COUNT;
+
+    private const int BORDER_VERTEX_COUNT = 2;
+
     // Start is called before the first frame update
     void Awake()
     {
@@ -68,7 +80,7 @@ public class LandscapeGenerator : MonoBehaviour
 
         float[,] heightMapData;
 
-        heightMapData = _heightMapGenerator.GenerateHeightMap(_vertexCountX * _worldSize + 2, _vertexCountY * _worldSize + 2);
+        heightMapData = _heightMapGenerator.GenerateHeightMap(HeightMapSizeX, HeightMapSizeY);
 
         GenerateChunks(heightMapData);
 
@@ -91,7 +103,7 @@ public class LandscapeGenerator : MonoBehaviour
             for (int chunkIndexX = 0; chunkIndexX < _worldSize; chunkIndexX++)
             {
                 // Calculate the location where the chunck will be place in world space (current Set up is centre origin)               
-                float chunkSize = (_vertexCountX - 1) * _meshGenerator.VertexSpacing;
+                float chunkSize = _meshSizeY * _meshGenerator.VertexSpacing;
 
                 float chunkBottomLeftX = _worldSize * chunkSize / -2f;
                 float chunkBottomLeftZ = _worldSize * chunkSize / -2f;
@@ -101,10 +113,10 @@ public class LandscapeGenerator : MonoBehaviour
 
                 Vector3 chunkPos = new Vector3(chunkPosX, 0f, chunkPosZ);
 
-                int sampleIndexStartX = chunkIndexX * (_vertexCountX - 1);
-                int sampleIndexStartY = chunkIndexY * (_vertexCountY - 1);
+                int sampleIndexStartX = chunkIndexX * _meshSizeX;
+                int sampleIndexStartY = chunkIndexY * _meshSizeX;
 
-                float[,] heightMapSection = new float[_vertexCountX + 2, _vertexCountY + 2];
+                float[,] heightMapSection = new float[BorderedMeshVertexCountX, BorderedMeshVertexCountY];
 
                 // Take Section of the heightmap and convert it to a chunk
                 for (int yy = 0; yy < heightMapSection.GetLength(1); yy++)
@@ -112,9 +124,9 @@ public class LandscapeGenerator : MonoBehaviour
                     for (int xx = 0; xx < heightMapSection.GetLength(0); xx++)
                     {
                         int sampleIndexX = sampleIndexStartX + xx;
-                        int sampleIndexY = sampleIndexStartY + yy;
+                        int sampleIndexY = sampleIndexStartY + yy;                       
 
-                        heightMapSection[xx, yy] = heightMap[sampleIndexX, sampleIndexY];
+                        heightMapSection[xx, yy] = heightMap[sampleIndexX, sampleIndexY];                       
                     }
                 }
 
@@ -165,7 +177,7 @@ public class LandscapeGenerator : MonoBehaviour
             _meshGenerator = gameObject.GetComponent<PlaneMeshGenerator>();
         }
 
-        if(_heightMapGenerator == null)
+        if (_heightMapGenerator == null)
         {
             _heightMapGenerator = gameObject.GetComponent<HeightMapGenerator>();
         }

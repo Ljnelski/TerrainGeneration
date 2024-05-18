@@ -1,10 +1,9 @@
 using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.UIElements;
 
-// 
-
-// Input => heightmap
-
-
+// mesh Size => Number of Squares in mesh
+// verticesPer Line => Number of vertices per line include mesh vertices and border vertices
 
 public class PlaneMeshGenerator : MonoBehaviour
 {
@@ -29,67 +28,73 @@ public class PlaneMeshGenerator : MonoBehaviour
             return null;
         }
 
-        int borderedSize = heightmap.GetLength(0);
-        int meshSize = borderedSize - 2;
+        int borderedVertexCount = heightmap.GetLength(0);
+        int meshVertexCount = borderedVertexCount - 2;
 
-        float meshBottomLeftX = (meshSize - 1) * _vertexSpacing / -2f;
-        float meshBottomLeftZ = (meshSize - 1) * _vertexSpacing / -2f;
+        float meshBottomLeftX = (meshVertexCount - 1) * _vertexSpacing / -2f;
+        float meshBottomLeftZ = (meshVertexCount - 1) * _vertexSpacing / -2f;
 
-        int meshSimplifcationIncrement = Mathf.Max((_meshLOD) * 2, 1);
-        int verticesPerLine = meshSize / meshSimplifcationIncrement + 1;
+        int meshSimplifcationIncrement = _meshLOD + 1;  //Mathf.Max(_meshLOD * 2, 1);
+
+        // meshVertexCount - 1 (Number of Quads) / meshSimplifictationIncrement (how many times the mesh is simplified) + 
+        // int verticesPerLine = ((meshVertexCount - 1) / meshSimplifcationIncrement) + 3;
 
         float vertexSpacing = _vertexSpacing;
 
         // MeshData to store vertex, tri, and normal data
-        MeshData meshData = new MeshData(verticesPerLine);
+        MeshData meshData = new MeshData(meshVertexCount - 1, meshSimplifcationIncrement);
 
-        int[,] vertexIndicesMap = new int[borderedSize, borderedSize];
         int meshVertexIndex = 0;
         int borderVertexIndex = -1;
+        int[,] vertexIndicesMap = new int[borderedVertexCount, borderedVertexCount];
 
         // map out all the vertex Indexs.
-        for (int yy = 0; yy < borderedSize; yy++)
+        for (int yy = 0; yy < borderedVertexCount; yy++)
         {
-            for (int xx = 0; xx < borderedSize; xx++)
+            for (int xx = 0; xx < borderedVertexCount; xx++)
             {
                 // if the vertex is a border vertex then give it a negative index, otherwise give it a positive index
-                bool isBorderVertex = xx == 0 || xx == borderedSize - 1 || yy == 0 || yy == borderedSize - 1;
+                bool isBorderVertex = xx == 0 || xx == borderedVertexCount - 1 || yy == 0 || yy == borderedVertexCount - 1;
+                bool isSkippedVertex = IsVertexSkipped(xx, yy);
 
-                if (isBorderVertex)
+                if (!isSkippedVertex)
                 {
-                    vertexIndicesMap[xx, yy] = borderVertexIndex;
-
-                    borderVertexIndex--;
-                }
-                else
-                {
-                    vertexIndicesMap[xx, yy] = meshVertexIndex;
-                    meshVertexIndex++;
+                    if (isBorderVertex)
+                    {
+                        vertexIndicesMap[xx, yy] = borderVertexIndex;
+                        borderVertexIndex--;
+                    }
+                    else
+                    {
+                        vertexIndicesMap[xx, yy] = meshVertexIndex;
+                        meshVertexIndex++;
+                    }
                 }
             }
         }
 
         // > generate vertices by looping through height and width
-        for (int yy = 0; yy < borderedSize; yy += meshSimplifcationIncrement)
+        for (int yy = 0; yy < borderedVertexCount; yy++)
         {
-            string line = "[";
-            for (int xx = 0; xx < borderedSize; xx += meshSimplifcationIncrement)
+            for (int xx = 0; xx < borderedVertexCount; xx++)
             {
+                bool skipVertex = IsVertexSkipped(xx, yy);
+
+                if (skipVertex) continue;
+
                 int vertexIndex = vertexIndicesMap[xx, yy];
-                if (vertexIndex >= 0)
-                    line += " " + vertexIndex + ",";
 
                 int heightMapSampleX = xx;
                 int heightMapSampleY = yy;
                 float heightMapValue = heightmap[heightMapSampleX, heightMapSampleY];
 
                 // finds a percent [0-1] value of where inside the actual mesh the vertex is 0 => left/bottom, 1 => right/top (also acts as UV value)
-                float percentX = (float)(xx - meshSimplifcationIncrement) / meshSize;
-                float percentY = (float)(yy - meshSimplifcationIncrement) / meshSize;
+                float percentX = (float)(xx - 1) / meshVertexCount;
+                float percentY = (float)(yy - 1) / meshVertexCount;
                 Vector2 percent = new Vector2(percentX, percentY);
 
-                float vertexPosX = meshBottomLeftX + percentX * meshSize * vertexSpacing;
-                float vertexPosZ = meshBottomLeftZ + percentY * meshSize * vertexSpacing;
+                float vertexPosX = meshBottomLeftX + percentX * meshVertexCount * vertexSpacing;
+                float vertexPosZ = meshBottomLeftZ + percentY * meshVertexCount * vertexSpacing;
                 float vertexPosY = _meshFloor + (_meshCeiling - _meshFloor) * heightMapValue;
 
                 Vector3 vertexPosition = new Vector3(vertexPosX, vertexPosY, vertexPosZ);
@@ -97,15 +102,21 @@ public class PlaneMeshGenerator : MonoBehaviour
                 meshData.AddVertex(vertexPosition, percent, vertexIndex);
 
                 // > Guard Clause to prevent Tris being created beyond the edges
-                if (!(xx < borderedSize - 1) || !(yy < borderedSize - 1)) continue;
+                if (!(xx <= borderedVertexCount - 2) || !(yy <= borderedVertexCount - 2)) continue;
 
                 // > The current vertex index if not caught by guard would be the top left of a square of vertexs
                 // and therefore two triangles can be created safely based on its position 
 
+                int triIndexIncrementX, triIndexIncrementY;
+
+                // Calculate whether the tri is a border, and if it needs to be stretched to the match the mesh simplification increment
+                triIndexIncrementX = (xx == 0 || xx == borderedVertexCount - 2) ? 1 : meshSimplifcationIncrement;
+                triIndexIncrementY = (yy == 0 || yy == borderedVertexCount - 2) ? 1 : meshSimplifcationIncrement;
+
                 int indexA = vertexIndicesMap[xx, yy];
-                int indexB = vertexIndicesMap[xx, yy + meshSimplifcationIncrement];
-                int indexC = vertexIndicesMap[xx + meshSimplifcationIncrement, yy + meshSimplifcationIncrement];
-                int indexD = vertexIndicesMap[xx + meshSimplifcationIncrement, yy];
+                int indexB = vertexIndicesMap[xx, yy + triIndexIncrementY];
+                int indexC = vertexIndicesMap[xx + triIndexIncrementX, yy + triIndexIncrementY];
+                int indexD = vertexIndicesMap[xx + triIndexIncrementX, yy];
 
                 // ABC
                 meshData.AddTriangle(indexA, indexB, indexC);
@@ -115,13 +126,15 @@ public class PlaneMeshGenerator : MonoBehaviour
             }
         }
 
+        bool IsVertexSkipped(int xx, int yy)
+        {
+            return (xx > 0 && xx < borderedVertexCount - 1 && ((xx - 1) % meshSimplifcationIncrement != 0)) || (yy > 0 && yy < borderedVertexCount - 1 && ((yy - 1) % meshSimplifcationIncrement != 0));
+        }
+
         meshData.CalculateNormals();
 
         return meshData.CreateMesh();
     }
-
-    public GameObject flag;
-    // Y translates to Z world space
 }
 
 public struct MeshData
@@ -138,14 +151,18 @@ public struct MeshData
     private int meshTriIndex;
     private int borderTriIndex;
 
-    public MeshData(int meshSize)
+    public MeshData(int meshSize, int vertexIncrement)
     {
-        meshVertices = new Vector3[meshSize * meshSize];
-        meshTriangles = new int[(meshSize - 1) * (meshSize - 1) * 6];
-        uvs = new Vector2[meshSize * meshSize];
+        meshVertices = new Vector3[(meshSize + 1) * (meshSize + 1)];
+        meshTriangles = new int[meshSize * meshSize * 2 * 3];
 
-        borderVertices = new Vector3[4 * meshSize + 4];
-        borderTriangles = new int[8 * meshSize * 3];
+        uvs = new Vector2[(meshSize + 1) * (meshSize + 1)];
+
+        // => 12 (corner triangles) + [meshSize/vertexIncrement - 1 (# of side vertexs) * 4 (sides)
+        borderVertices = new Vector3[12 + (meshSize / vertexIncrement - 1) * 4];
+
+        // => [8 (corner triangles) + meshSize (squares) * 2 (triangles per square) / Increment  * 4 (4 sides)] * 3 (vertices per triangle)
+        borderTriangles = new int[24 + 24 * meshSize / vertexIncrement];
 
         vertexNormals = new Vector3[meshVertices.Length];
 
@@ -161,10 +178,19 @@ public struct MeshData
         }
         else
         {
-            //Debug.LogError("Adding a vertex");
             meshVertices[vertexIndex] = vertexPos;
             uvs[vertexIndex] = vertexUV;
         }
+    }
+
+    public void AddMeshVertex(Vector3 vertexPos, Vector3 vertexUV, int vertexIndex)
+    {
+        meshVertices[vertexIndex] = vertexPos;
+    }
+
+    public void AddBorderVertex(Vector3 vertexPos, Vector3 vertexUV, int vertexIndex)
+    {
+        borderVertices[vertexIndex] = vertexPos;
     }
 
     public void AddTriangle(int vertIndexA, int vertIndexB, int vertIndexC)

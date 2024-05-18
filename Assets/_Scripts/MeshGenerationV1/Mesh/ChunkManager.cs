@@ -39,10 +39,10 @@ public class ChunkManager : MonoBehaviour
         _chunkObjs = new GameObject[worldWidth, worldWidth];
 
 
-        Debug.Log("Children: ");
+        //Debug.Log("Children: ");
         for (int i = 0; i < chunksInScene.Length; i++)
         {
-            Debug.Log(chunksInScene[i].name);
+            //Debug.Log(chunksInScene[i].name);
         }
 
 
@@ -50,9 +50,9 @@ public class ChunkManager : MonoBehaviour
         {
             for (int xx = 0; xx < worldWidth; xx++)
             {
-                Debug.Log("Adding Chunk");
+                //Debug.Log("Adding Chunk");
                 _chunkObjs[xx, yy] = chunksInScene[xx + yy * worldWidth].gameObject;
-                Debug.Log(_chunkObjs[xx, yy].name);
+                //Debug.Log(_chunkObjs[xx, yy].name);
             }
         }
     }
@@ -92,9 +92,6 @@ public class ChunkManager : MonoBehaviour
             ResizeChunkObjs();
         }
 
-        Debug.Log("ChunkObjs Count: " + _chunkObjs.Length);
-        Debug.Log("ChunkData Counts: " + _chunkData.Length);
-
         // Update the chunks with 
         int worldWidth = _chunkData.GetLength(0);
         for (int yy = 0; yy < _chunkData.GetLength(1); yy++)
@@ -132,8 +129,6 @@ public class ChunkManager : MonoBehaviour
 
     private void ResizeChunkObjs()
     {
-        Debug.Log("Size Before: " + _chunkObjs.Length);
-
         // Create new Array with new dimesions
         GameObject[,] _chunksUpdatedSize = new GameObject[_chunkData.GetLength(0), _chunkData.GetLength(1)];
 
@@ -163,8 +158,6 @@ public class ChunkManager : MonoBehaviour
         }
 
         _chunkObjs = _chunksUpdatedSize;
-        Debug.Log("Size After: " + _chunkObjs.Length);
-
     }
 
     // Loads all chunkObjects in scene with the most recent meshes
