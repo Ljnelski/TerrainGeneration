@@ -46,9 +46,11 @@ public class LandscapeGenerator : MonoBehaviour
     [Header("Debug")]
     [SerializeField] private GameObject _debugFlag;
     //private LandscapeData _landscapeData;
-    private List<Vector3> _debugPositions;
+    private List<Vector3> _debugPositions;   
 
     private float _currentErosionIterations;
+
+    // --- PROPERTIES ----
 
     private int MeshVertexCountX => _meshSizeX + 1;
     private int MeshVertexCountY => _meshSizeY + 1;
@@ -59,6 +61,7 @@ public class LandscapeGenerator : MonoBehaviour
     private int HeightMapSizeX => MeshVertexCountX * _worldSize + BORDER_VERTEX_COUNT;
     private int HeightMapSizeY => MeshVertexCountY * _worldSize + BORDER_VERTEX_COUNT;
 
+    // --- CONSTANTS ---
     private const int BORDER_VERTEX_COUNT = 2;
 
     // Start is called before the first frame update
@@ -82,7 +85,7 @@ public class LandscapeGenerator : MonoBehaviour
 
         heightMapData = _heightMapGenerator.GenerateHeightMap(HeightMapSizeX, HeightMapSizeY);
 
-        GenerateChunks(heightMapData);
+        ScaffoldChunks(heightMapData);
 
         if (_generateTexture)
         {
@@ -94,9 +97,10 @@ public class LandscapeGenerator : MonoBehaviour
             _textureGenerator.SaveTexture(heightMapData);
         }
     }
-    private void GenerateChunks(float[,] heightMap)
+
+    public void ScaffoldChunks(float[,] heightMap)
     {
-        ChunkData[,] chunkData = new ChunkData[_worldSize, _worldSize];
+        _chunkManager.Init(_worldSize, _worldSize);
 
         for (int chunkIndexY = 0; chunkIndexY < _worldSize; chunkIndexY++)
         {
@@ -124,19 +128,63 @@ public class LandscapeGenerator : MonoBehaviour
                     for (int xx = 0; xx < heightMapSection.GetLength(0); xx++)
                     {
                         int sampleIndexX = sampleIndexStartX + xx;
-                        int sampleIndexY = sampleIndexStartY + yy;                       
+                        int sampleIndexY = sampleIndexStartY + yy;
 
-                        heightMapSection[xx, yy] = heightMap[sampleIndexX, sampleIndexY];                       
+                        heightMapSection[xx, yy] = heightMap[sampleIndexX, sampleIndexY];
                     }
                 }
 
-                Mesh chunkMesh = _meshGenerator.GenerateFromHeightMap(heightMapSection);
-                chunkData[chunkIndexX, chunkIndexY] = new ChunkData(chunkPos, chunkMesh);
+                ChunkData chunkData = new ChunkData(chunkIndexX, chunkIndexY, heightMapSection, chunkPos);
+                _chunkManager.AddChunk(chunkData);
             }
         }
 
-        _chunkManager.LoadChunks(chunkData);
+        _chunkManager.BuildChunks();
     }
+
+    //private void GenerateChunks(float[,] heightMap)
+    //{
+    //    ChunkData[,] chunkData = new ChunkData[_worldSize, _worldSize];
+
+    //    for (int chunkIndexY = 0; chunkIndexY < _worldSize; chunkIndexY++)
+    //    {
+    //        for (int chunkIndexX = 0; chunkIndexX < _worldSize; chunkIndexX++)
+    //        {
+    //            // Calculate the location where the chunck will be place in world space (current Set up is centre origin)               
+    //            float chunkSize = _meshSizeY * _meshGenerator.VertexSpacing;
+
+    //            float chunkBottomLeftX = _worldSize * chunkSize / -2f;
+    //            float chunkBottomLeftZ = _worldSize * chunkSize / -2f;
+
+    //            float chunkPosX = chunkBottomLeftX + chunkIndexX * chunkSize + chunkSize / 2;
+    //            float chunkPosZ = chunkBottomLeftZ + chunkIndexY * chunkSize + chunkSize / 2;
+
+    //            Vector3 chunkPos = new Vector3(chunkPosX, 0f, chunkPosZ);
+
+    //            int sampleIndexStartX = chunkIndexX * _meshSizeX;
+    //            int sampleIndexStartY = chunkIndexY * _meshSizeX;
+
+    //            float[,] heightMapSection = new float[BorderedMeshVertexCountX, BorderedMeshVertexCountY];
+
+    //            // Take Section of the heightmap and convert it to a chunk
+    //            for (int yy = 0; yy < heightMapSection.GetLength(1); yy++)
+    //            {
+    //                for (int xx = 0; xx < heightMapSection.GetLength(0); xx++)
+    //                {
+    //                    int sampleIndexX = sampleIndexStartX + xx;
+    //                    int sampleIndexY = sampleIndexStartY + yy;                       
+
+    //                    heightMapSection[xx, yy] = heightMap[sampleIndexX, sampleIndexY];                       
+    //                }
+    //            }
+
+    //            Mesh chunkMesh = _meshGenerator.GenerateFromHeightMap(heightMapSection);
+    //            chunkData[chunkIndexX, chunkIndexY] = new ChunkData(chunkPos, chunkMesh);
+    //        }
+    //    }
+
+    //    _chunkManager.LoadChunks(chunkData);
+    //}
 
     public void UpdateTexture(float[,] heightMapData)
     {

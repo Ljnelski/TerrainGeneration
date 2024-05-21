@@ -13,7 +13,6 @@ public class LandscapeData
         _meshCeiling = meshCeiling;
         _meshFloor = meshFloor;
 
-
         // Calculate the offset that is used to place the vertices in the world to make the mesh is centred in the centre of the world
         _bottomLeftX = worldSize * (chunkSizeX - 1) / -2f * vertexSpacing;
         _bottomLeftZ = worldSize * (chunkSizeY - 1) / -2f * vertexSpacing;
@@ -21,7 +20,7 @@ public class LandscapeData
         //Debug.Log("_BottomLeftX: " + _bottomLeftX);
         //Debug.Log("_BottomLeftZ: " + _bottomLeftZ);
 
-        _chunks = new ChunkData[worldSize, worldSize];
+        _chunks = new Chunk[worldSize, worldSize];
 
         _hasMeshVertexParameters = true;
     }
@@ -35,7 +34,7 @@ public class LandscapeData
     private int _worldSize;
     private int _chunkSizeX;
     private int _chunkSizeY;
-    private ChunkData[,] _chunks;
+    private Chunk[,] _chunks;
     private float _meshVertexSpacing;
     private float _bottomLeftX; // world X pos of top left vertex, heightmap index [0,0] is this vertex
     private float _bottomLeftZ; // world Z pos of top left vertex
@@ -58,7 +57,7 @@ public class LandscapeData
     public float MeshCeiling { get => _meshCeiling; set => _meshCeiling = value; }
     public float MeshFloor { get => _meshFloor; set => _meshFloor = value; }
 
-    public ChunkData[,] ChunkData { get => _chunks; }
+    public Chunk[,] ChunkData { get => _chunks; }
     public float[,] HeightMap { get => _heightMap; set => _heightMap = value; }
 
     public bool HasMeshVertexParameters { get => _hasMeshVertexParameters; }
@@ -94,7 +93,7 @@ public class LandscapeData
         return Mathf.Max(value * _meshCeiling, _meshFloor);
     }
 
-    public void SetChuck(int x, int y, ChunkData chunk)
+    public void SetChuck(int x, int y, Chunk chunk)
     {
         _chunks[x, y] = chunk;
     }
