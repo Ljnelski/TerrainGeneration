@@ -2,15 +2,14 @@
 
 public class Chunk
 {
-    public Vector3 WorldPosition;    
-    
+    public Vector3 WorldPosition;
     public Mesh Mesh;
 
     public Chunk(Vector3 worldPosition, Mesh chunkMesh)
     {
         WorldPosition = worldPosition;
         Mesh = chunkMesh;
-    }   
+    }
 }
 
 
@@ -24,7 +23,7 @@ public struct ChunkData
 
     public int lod;
 
-    public ChunkData(int chunkIndexX, int chunkIndexY, float[,] heightMap, Vector3 worldPosition)
+    public ChunkData(int chunkIndexX, int chunkIndexY, float[,] heightMap, Vector3 worldPosition, int LOD)
     {
         ChunkIndexX = chunkIndexX;
         ChunkIndexY = chunkIndexY;
@@ -32,6 +31,6 @@ public struct ChunkData
         WorldPosition = worldPosition;
         HeightMap = heightMap;
 
-        lod = 0;
-    }   
+        lod = LOD;
+    }    
 }

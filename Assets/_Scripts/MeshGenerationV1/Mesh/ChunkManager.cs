@@ -1,30 +1,30 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using Unity.Mathematics;
-using Unity.VisualScripting;
-using UnityEditor;
 using UnityEngine;
-using static UnityEngine.Rendering.VolumeComponent;
 
 public class ChunkManager : MonoBehaviour
 {
     [SerializeField] private GameObject _chunkObject;
     [SerializeField] private float _chunkUpdateFrequency = 0.1f;
 
-    private GameObject[,] _chunkObjs;
+    [Header("Mesh LOD")]
+    [SerializeField] private Transform _viewerObject;
+    [SerializeField] private float _LODThreshold;
+
     private PlaneMeshGenerator _meshGenerator;
 
+    private GameObject[,] _chunkObjs;
     private Chunk[,] _chunks;
     private Queue<ChunkData> _chunksToDraw;
 
     private Stack<GameObject> _chunkObjectPool;
 
-    // Gets a Reference to all existing chunk gameObjects in scene     
-
     public void Init(int width, int height)
     {
-        _chunks = new Chunk[width, height];
+        Debug.Log("Init Called");
+
+        _chunks = new Chunk[width, height];       
         _chunksToDraw = new Queue<ChunkData>();
 
         if (_chunkObjs == null)
@@ -33,59 +33,21 @@ public class ChunkManager : MonoBehaviour
         }
 
         _meshGenerator = GetComponent<PlaneMeshGenerator>();
-    }
-
-    public void GetChunkObjectsFromScene()
-    {
-        MeshFilter[] chunksInScene = gameObject.transform.GetComponentsInChildren<MeshFilter>();
-
-        _chunkObjectPool = new Stack<GameObject>();
-
-        foreach (MeshFilter meshFilter in chunksInScene)
-        {
-            PoolChunk(meshFilter.gameObject);
-        }
-    }
-
-    public void GetChunkDataFromScene()
-    {
-        _chunks = new Chunk[_chunkObjs.GetLength(0), _chunkObjs.GetLength(1)];
-
-        for (int yy = 0; yy < _chunkObjs.GetLength(1); yy++)
-        {
-            for (int xx = 0; xx < _chunkObjs.GetLength(0); xx++)
-            {
-                //Debug.Log("_chunkObjs in ChunkDataCreation is null: " + (_chunkData == null));
-
-                Debug.Log(_chunkObjs[xx, yy].name);
-
-                Chunk data = new Chunk(
-                _chunkObjs[xx, yy].GetComponent<Transform>().position,
-                _chunkObjs[xx, yy].GetComponent<MeshFilter>().sharedMesh
-                );
-
-                _chunks[xx, yy] = data;
-            }
-        }
-    }
-
-    public void AddChunk(ChunkData chunkData)
-    {
-        _chunksToDraw.Enqueue(chunkData);
-    }
+    }    
 
     public void BuildChunks()
     {
+        if (_chunkObjs == null)
+        {
+            _chunkObjs = new GameObject[_chunks.GetLength(0), _chunks.GetLength(1)];
+        }
+
         if (Application.IsPlaying(gameObject))
         {
             StartCoroutine(ChunkUpdateLoop());
         }
         else
-        {
-            if (_chunkObjs == null)
-            {
-                _chunkObjs = new GameObject[_chunks.GetLength(0), _chunks.GetLength(1)];
-            }
+        { 
 
             if (_chunks.Length != _chunkObjs.Length)
             {
@@ -100,31 +62,30 @@ public class ChunkManager : MonoBehaviour
         }
     }
 
+    public void AddChunk(ChunkData chunkData)
+    {
+        _chunksToDraw.Enqueue(chunkData);
+    }
+
+    // TODO Make Update Existing Chunk
     private void LoadChunkFromChunkData(ChunkData chunkData)
     {
-        Mesh mesh = _meshGenerator.GenerateFromHeightMap(chunkData.HeightMap);
-        Chunk chunk = _chunks[chunkData.ChunkIndexX, chunkData.ChunkIndexY];
+        Debug.Log("Drawing Chunk Mesh: " + chunkData.ChunkIndexX + ", " + chunkData.ChunkIndexY);
+        Debug.Log("Chunk LOD" + chunkData.lod);
 
+        Mesh newMesh = _meshGenerator.GenerateFromHeightMap(chunkData.HeightMap, chunkData.lod);
+
+        Chunk chunk = _chunks[chunkData.ChunkIndexX, chunkData.ChunkIndexY];
         if (chunk == null)
         {
-            chunk = new Chunk(chunkData.WorldPosition, mesh);
+            chunk = new Chunk(chunkData.WorldPosition, newMesh);
         }
         else
         {
             chunk.WorldPosition = chunkData.WorldPosition;
         }
 
-        _chunks[chunkData.ChunkIndexX, chunkData.ChunkIndexY] = chunk;
-
-        UpdateChunkObject(chunkData.ChunkIndexX, chunkData.ChunkIndexY);
-    }
-
-    private void UpdateChunkObject(int x, int y)
-    {
-        Chunk chunk = _chunks[x, y];
-        GameObject chunkObj = _chunkObjs[x, y];
-
-        // If there is no ChunkGameObject, grab a new one
+        GameObject chunkObj = _chunkObjs[chunkData.ChunkIndexX, chunkData.ChunkIndexY];
         if (chunkObj == null)
         {
             chunkObj = GetNewChunkObject();
@@ -139,9 +100,16 @@ public class ChunkManager : MonoBehaviour
 
         chunkObj.transform.position = chunk.WorldPosition;
         chunkObj.GetComponent<MeshFilter>().sharedMesh = chunk.Mesh;
-        chunkObj.name = "Chunk (" + x + ", " + y + ")";
+        chunkObj.name = "Chunk (" + chunkData.ChunkIndexX + ", " + chunkData.ChunkIndexY + ")";
 
-        _chunkObjs[x, y] = chunkObj;
+        _chunkObjs[chunkData.ChunkIndexX, chunkData.ChunkIndexY] = chunkObj;
+    }
+
+    private void UpdateChunkObject(int x, int y)
+    {
+        Chunk chunk = _chunks[x, y];
+
+        
     }
 
     private IEnumerator ChunkUpdateLoop()
@@ -165,42 +133,6 @@ public class ChunkManager : MonoBehaviour
         {
             LoadChunkFromChunkData(_chunksToDraw.Dequeue());
         }
-    }
-
-    private GameObject GetNewChunkObject()
-    {
-        GameObject chunkObj = null;
-
-
-        if (_chunkObjectPool.Count > 0)
-        {
-            while (chunkObj == null)
-            {
-                chunkObj = _chunkObjectPool.Pop();
-            }
-
-            chunkObj?.SetActive(true);
-        }
-
-        if (chunkObj == null)
-        {
-            chunkObj = InstantiateChunkObject();
-        }
-
-        return chunkObj;
-    }
-
-    private GameObject InstantiateChunkObject()
-    {
-        GameObject chunkGameObject = Instantiate(_chunkObject, Vector3.zero, Quaternion.identity, gameObject.transform);
-        return chunkGameObject;
-    }
-
-    private void PoolChunk(GameObject chunkObj)
-    {
-        chunkObj.SetActive(false);
-        chunkObj.name = "Pooled Chunk";
-        _chunkObjectPool.Push(chunkObj);
     }
 
     private void ResizeChunkObjs()
@@ -238,6 +170,54 @@ public class ChunkManager : MonoBehaviour
         _chunkObjs = _chunksUpdatedSize;
     }
 
+    public void GetChunkObjectsFromScene()
+    {
+        MeshFilter[] chunksInScene = gameObject.transform.GetComponentsInChildren<MeshFilter>();
+
+        _chunkObjectPool = new Stack<GameObject>();
+
+        foreach (MeshFilter meshFilter in chunksInScene)
+        {
+            PoolChunk(meshFilter.gameObject);
+        }
+    }
+
+    private GameObject GetNewChunkObject()
+    {
+        GameObject chunkObj = null;
+
+
+        if (_chunkObjectPool.Count > 0)
+        {
+            while (chunkObj == null)
+            {
+                chunkObj = _chunkObjectPool.Pop();
+            }
+
+            chunkObj?.SetActive(true);
+        }
+
+        if (chunkObj == null)
+        {
+            chunkObj = InstantiateChunkObject();
+        }
+
+        return chunkObj;
+    }
+
+    private GameObject InstantiateChunkObject()
+    {
+        GameObject chunkGameObject = Instantiate(_chunkObject, Vector3.zero, Quaternion.identity, gameObject.transform);
+        return chunkGameObject;
+    }
+
+    private void PoolChunk(GameObject chunkObj)
+    {
+        chunkObj.SetActive(false);
+        chunkObj.name = "Pooled Chunk";
+        _chunkObjectPool.Push(chunkObj);
+    }  
+
     public void DestroyChunk(GameObject chunkObject)
     {
         // Mesh must be explicitly Destroyed to free it from memory
@@ -265,47 +245,25 @@ public class ChunkManager : MonoBehaviour
         }
     }
 
-
-    // Loads all chunkObjects in scene with the most recent meshes
-    /*public void UpdateChunkGameObjects()
+    public void GetChunkDataFromScene()
     {
-        if (_chunkObjs == null)
-        {
-            _chunkObjs = new GameObject[_chunks.GetLength(0), _chunks.GetLength(1)];
-        }
+        _chunks = new Chunk[_chunkObjs.GetLength(0), _chunkObjs.GetLength(1)];
 
-        if (_chunks.Length != _chunkObjs.Length)
+        for (int yy = 0; yy < _chunkObjs.GetLength(1); yy++)
         {
-            ResizeChunkObjs();
-        }
-
-        // Update the chunks with 
-        int worldWidth = _chunks.GetLength(0);
-        for (int yy = 0; yy < _chunks.GetLength(1); yy++)
-        {
-            for (int xx = 0; xx < worldWidth; xx++)
+            for (int xx = 0; xx < _chunkObjs.GetLength(0); xx++)
             {
-                Chunk chunk = _chunks[xx, yy];
+                //Debug.Log("_chunkObjs in ChunkDataCreation is null: " + (_chunkData == null));
 
-                if (_chunkObjs[xx, yy] == null)
-                {
-                    InstantiateChunkObject(xx, yy);
-                }
+                Debug.Log(_chunkObjs[xx, yy].name);
 
-                // Free Old Mesh from memory
-                if (_chunkObject.GetComponent<MeshFilter>())
-                {
-                    Mesh mesh = _chunkObject.GetComponent<MeshFilter>().sharedMesh;
-                    Resources.UnloadAsset(mesh);
-                }
+                Chunk data = new Chunk(
+                _chunkObjs[xx, yy].GetComponent<Transform>().position,
+                _chunkObjs[xx, yy].GetComponent<MeshFilter>().sharedMesh
+                );
 
-                GameObject chunkObj = _chunkObjs[xx, yy];
-                chunkObj.transform.position = chunk.WorldPosition;
-
-                chunkObj.GetComponent<MeshFilter>().sharedMesh = chunk.Mesh;
+                _chunks[xx, yy] = data;
             }
         }
-
-        //Resources.UnloadUnusedAssets();
-    }*/
+    }
 }

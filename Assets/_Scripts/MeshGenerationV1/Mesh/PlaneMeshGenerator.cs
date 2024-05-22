@@ -16,11 +16,14 @@ public class PlaneMeshGenerator : MonoBehaviour
     [Header("Mesh size Properties")]
     [SerializeField] private float _vertexSpacing = 0.5f;
 
-    [Header("Other")]
-    [SerializeField] private int _meshLOD;
-
     // Feed in whole or section of heightmap, the edge values will be used for normal calculation to remove seams  
-    public Mesh GenerateFromHeightMap(float[,] heightmap)
+
+    public Mesh GenerateFromHeightMap(float[,] heightMap)
+    {
+        return GenerateFromHeightMap(heightMap, 0);
+    }
+
+    public Mesh GenerateFromHeightMap(float[,] heightmap, int LOD)
     {
         if (heightmap.GetLength(0) != heightmap.GetLength(1))
         {
@@ -34,7 +37,7 @@ public class PlaneMeshGenerator : MonoBehaviour
         float meshBottomLeftX = (meshVertexCount - 1) * _vertexSpacing / -2f;
         float meshBottomLeftZ = (meshVertexCount - 1) * _vertexSpacing / -2f;
 
-        int meshSimplifcationIncrement = _meshLOD + 1;  //Mathf.Max(_meshLOD * 2, 1);
+        int meshSimplifcationIncrement = LOD + 1;  //Mathf.Max(_meshLOD * 2, 1);
 
         // meshVertexCount - 1 (Number of Quads) / meshSimplifictationIncrement (how many times the mesh is simplified) + 
         // int verticesPerLine = ((meshVertexCount - 1) / meshSimplifcationIncrement) + 3;

@@ -20,6 +20,9 @@ A world is made up of several chunks. Each Chunk has its own Mesh
 
 worldSize: the number of Chunks on each axis that will be generated 
 
+chunkSize: Refers to the total size of the chunk on a axis
+chunkSize = meshSize * VertexSpacing;
+
 --- Height Map ---
 
 The height map is a two dimesional float array with values ranging from 0 - 1 or -1 to 1. Each Cell can be visualized as a pixel on a image. each one of these 'pixels'

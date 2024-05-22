@@ -6,7 +6,18 @@ using UnityEngine;
 public partial class HeightMapGenerator : MonoBehaviour
 {
     [SerializeField] private List<BaseProceduralTexture> _proceduralTextures;
-    public List<BaseProceduralTexture> ProceduralTextures => _proceduralTextures;    
+    public List<BaseProceduralTexture> ProceduralTextures
+    {
+        get
+        {
+            if (_proceduralTextures == null)
+            {
+                _proceduralTextures = new List<BaseProceduralTexture>();
+            }
+
+            return _proceduralTextures;
+        }
+    }
 
     private void CreateProceduralTexture(ProceduralTextureType type)
     {
@@ -36,11 +47,11 @@ public partial class HeightMapGenerator : MonoBehaviour
         float[,] heightMap = new float[width, height];
 
         if (_proceduralTextures == null)
-        {            
+        {
             return heightMap;
         }
 
-        if(_proceduralTextures.Count == 0 )
+        if (_proceduralTextures.Count == 0)
         {
             Debug.LogWarning("HeightMapGenerator WARNING: No Generated Textures found on GameObject; Heightmap will be all 0");
             return heightMap;
@@ -52,7 +63,7 @@ public partial class HeightMapGenerator : MonoBehaviour
         }
 
         return heightMap;
-    }     
+    }
 
     public void AddProcedurealTexture(ProceduralTextureType PT_Type)
     {

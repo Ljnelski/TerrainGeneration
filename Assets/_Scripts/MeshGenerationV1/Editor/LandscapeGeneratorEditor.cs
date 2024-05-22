@@ -46,7 +46,7 @@ public class LandscapeGeneratorEditor : Editor
 
         if(GUILayout.Button("RunErosion"))
         {
-            meshGenerator.StartErosion();
+            //meshGenerator.StartErosion();
         }
 
         EditorGUILayout.EndFoldoutHeaderGroup();

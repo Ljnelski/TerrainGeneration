@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Profiling;
+using UnityEngine.UIElements;
 
 public class LandscapeGenerator : MonoBehaviour
 {
@@ -23,14 +24,16 @@ public class LandscapeGenerator : MonoBehaviour
     // > Unity uses Y axis for height, so Y Axis is translated to the Z access when 
     // Generating points
 
+    [Header("Viewer")]
+    [SerializeField] Transform _viewerObject;
+
     [Header("LandscapeOptions")]
-    [SerializeField] private int _worldSize; // number of chuncks to render
+    [SerializeField] private int _worldSize; // number of chunks to render
 
     [Header("Mesh Options")]
     const int _meshSizeX = 240; // # of squares in mesh along X
     const int _meshSizeY = 240; // # of squares in mesh along Y
     [Range(0, 6)]
-    [SerializeField] private int _meshLOD = 0;
 
     [Header("Erosion")]
     [SerializeField] private float _erosionTickTime = 0.5f;
@@ -38,19 +41,26 @@ public class LandscapeGenerator : MonoBehaviour
     [SerializeField] private float _erosionIterations = 10f;
 
     [Header("Options")]
-
     [SerializeField] private bool _autoUpdate;
     [SerializeField] private bool _generateTexture;
     [SerializeField] private bool _saveTexture;
 
     [Header("Debug")]
     [SerializeField] private GameObject _debugFlag;
-    //private LandscapeData _landscapeData;
-    private List<Vector3> _debugPositions;   
 
+    private List<Vector3> _debugPositions;   
     private float _currentErosionIterations;
 
+    private float[,] _heightMap;
+
+    private Vector3 _previousViewerPosition;
+    private int _chunkCoordX;
+    private int _chunkCoordY;
+
     // --- PROPERTIES ----
+
+    private float ChunkSizeX => MeshVertexCountX * 1f;
+    private float ChunkSizeY => MeshVertexCountY * 1f;
 
     private int MeshVertexCountX => _meshSizeX + 1;
     private int MeshVertexCountY => _meshSizeY + 1;
@@ -61,12 +71,17 @@ public class LandscapeGenerator : MonoBehaviour
     private int HeightMapSizeX => MeshVertexCountX * _worldSize + BORDER_VERTEX_COUNT;
     private int HeightMapSizeY => MeshVertexCountY * _worldSize + BORDER_VERTEX_COUNT;
 
+    private float WorldStartX => _worldSize * ChunkSizeX / -2f;
+    private float WorldStartZ => _worldSize * ChunkSizeY / -2f;
+
     // --- CONSTANTS ---
     private const int BORDER_VERTEX_COUNT = 2;
 
     // Start is called before the first frame update
     void Awake()
     {
+        _previousViewerPosition = _viewerObject.position;
+
         _meshGenerator = GetComponent<PlaneMeshGenerator>();
         _heightMapGenerator = GetComponent<HeightMapGenerator>();
         GenerateTerrain();
@@ -79,130 +94,126 @@ public class LandscapeGenerator : MonoBehaviour
 
 #if UNITY_EDITOR
         GetScriptReferences();
-#endif
+#endif        
 
-        float[,] heightMapData;
+        _heightMap = _heightMapGenerator.GenerateHeightMap(HeightMapSizeX, HeightMapSizeY);
+        _chunkManager.Init(_worldSize, _worldSize);
 
-        heightMapData = _heightMapGenerator.GenerateHeightMap(HeightMapSizeX, HeightMapSizeY);
+        ScaffoldChunks();
 
-        ScaffoldChunks(heightMapData);
+        _chunkManager.BuildChunks();
+
 
         if (_generateTexture)
         {
-            UpdateTexture(heightMapData);
+            UpdateTexture(_heightMap);
         }
 
         if (_saveTexture)
         {
-            _textureGenerator.SaveTexture(heightMapData);
+            _textureGenerator.SaveTexture(_heightMap);
         }
     }
 
-    public void ScaffoldChunks(float[,] heightMap)
+    public void ScaffoldChunks()
     {
-        _chunkManager.Init(_worldSize, _worldSize);
-
         for (int chunkIndexY = 0; chunkIndexY < _worldSize; chunkIndexY++)
         {
             for (int chunkIndexX = 0; chunkIndexX < _worldSize; chunkIndexX++)
             {
-                // Calculate the location where the chunck will be place in world space (current Set up is centre origin)               
-                float chunkSize = _meshSizeY * _meshGenerator.VertexSpacing;
+                DrawChunk(chunkIndexX, chunkIndexY);            
+            }
+        }
+    }
 
-                float chunkBottomLeftX = _worldSize * chunkSize / -2f;
-                float chunkBottomLeftZ = _worldSize * chunkSize / -2f;
+    // Calculate the World Space where the chunk should Lie
+    private Vector3 CalculateChunkWorldPosition(int chunkIndexX, int chunkIndexY)
+    {
+        float chunkSize = _meshSizeY * _meshGenerator.VertexSpacing;
+               
+        float chunkPosX = WorldStartX + chunkIndexX * chunkSize + chunkSize / 2;
+        float chunkPosZ = WorldStartZ + chunkIndexY * chunkSize + chunkSize / 2;
 
-                float chunkPosX = chunkBottomLeftX + chunkIndexX * chunkSize + chunkSize / 2;
-                float chunkPosZ = chunkBottomLeftZ + chunkIndexY * chunkSize + chunkSize / 2;
+        return new Vector3(chunkPosX, 0f, chunkPosZ);
+    }
 
-                Vector3 chunkPos = new Vector3(chunkPosX, 0f, chunkPosZ);
+    // Cuts out a chunk of the height map that has been generated
+    private float[,] SampleHeightMapSection(float[,] heightMap, int chunkIndexX, int chunkIndexY)
+    {
+        int sampleIndexStartX = chunkIndexX * _meshSizeX;
+        int sampleIndexStartY = chunkIndexY * _meshSizeX;
 
-                int sampleIndexStartX = chunkIndexX * _meshSizeX;
-                int sampleIndexStartY = chunkIndexY * _meshSizeX;
+        float[,] heightMapSection = new float[BorderedMeshVertexCountX, BorderedMeshVertexCountY];
 
-                float[,] heightMapSection = new float[BorderedMeshVertexCountX, BorderedMeshVertexCountY];
+        // Take Section of the heightmap and convert it to a chunk
+        for (int yy = 0; yy < heightMapSection.GetLength(1); yy++)
+        {
+            for (int xx = 0; xx < heightMapSection.GetLength(0); xx++)
+            {
+                int sampleIndexX = sampleIndexStartX + xx;
+                int sampleIndexY = sampleIndexStartY + yy;
 
-                // Take Section of the heightmap and convert it to a chunk
-                for (int yy = 0; yy < heightMapSection.GetLength(1); yy++)
-                {
-                    for (int xx = 0; xx < heightMapSection.GetLength(0); xx++)
-                    {
-                        int sampleIndexX = sampleIndexStartX + xx;
-                        int sampleIndexY = sampleIndexStartY + yy;
-
-                        heightMapSection[xx, yy] = heightMap[sampleIndexX, sampleIndexY];
-                    }
-                }
-
-                ChunkData chunkData = new ChunkData(chunkIndexX, chunkIndexY, heightMapSection, chunkPos);
-                _chunkManager.AddChunk(chunkData);
+                heightMapSection[xx, yy] = heightMap[sampleIndexX, sampleIndexY];
             }
         }
 
-        _chunkManager.BuildChunks();
+        return heightMapSection;
     }
 
-    //private void GenerateChunks(float[,] heightMap)
-    //{
-    //    ChunkData[,] chunkData = new ChunkData[_worldSize, _worldSize];
-
-    //    for (int chunkIndexY = 0; chunkIndexY < _worldSize; chunkIndexY++)
-    //    {
-    //        for (int chunkIndexX = 0; chunkIndexX < _worldSize; chunkIndexX++)
-    //        {
-    //            // Calculate the location where the chunck will be place in world space (current Set up is centre origin)               
-    //            float chunkSize = _meshSizeY * _meshGenerator.VertexSpacing;
-
-    //            float chunkBottomLeftX = _worldSize * chunkSize / -2f;
-    //            float chunkBottomLeftZ = _worldSize * chunkSize / -2f;
-
-    //            float chunkPosX = chunkBottomLeftX + chunkIndexX * chunkSize + chunkSize / 2;
-    //            float chunkPosZ = chunkBottomLeftZ + chunkIndexY * chunkSize + chunkSize / 2;
-
-    //            Vector3 chunkPos = new Vector3(chunkPosX, 0f, chunkPosZ);
-
-    //            int sampleIndexStartX = chunkIndexX * _meshSizeX;
-    //            int sampleIndexStartY = chunkIndexY * _meshSizeX;
-
-    //            float[,] heightMapSection = new float[BorderedMeshVertexCountX, BorderedMeshVertexCountY];
-
-    //            // Take Section of the heightmap and convert it to a chunk
-    //            for (int yy = 0; yy < heightMapSection.GetLength(1); yy++)
-    //            {
-    //                for (int xx = 0; xx < heightMapSection.GetLength(0); xx++)
-    //                {
-    //                    int sampleIndexX = sampleIndexStartX + xx;
-    //                    int sampleIndexY = sampleIndexStartY + yy;                       
-
-    //                    heightMapSection[xx, yy] = heightMap[sampleIndexX, sampleIndexY];                       
-    //                }
-    //            }
-
-    //            Mesh chunkMesh = _meshGenerator.GenerateFromHeightMap(heightMapSection);
-    //            chunkData[chunkIndexX, chunkIndexY] = new ChunkData(chunkPos, chunkMesh);
-    //        }
-    //    }
-
-    //    _chunkManager.LoadChunks(chunkData);
-    //}
-
-    public void UpdateTexture(float[,] heightMapData)
+    public void DrawChunk(int chunkIndexX, int chunkIndexY)
     {
-        //Texture2D newTexture = _textureGenerator.ValueFromHeightMap(heightMapData);
-        Texture2D newTexture = _textureGenerator.ColourFromHeightMap(heightMapData);
-        newTexture.Apply();
-        _textureDisplay.DrawTexture(newTexture);
+        Vector3 chunkPosition = CalculateChunkWorldPosition(chunkIndexX, chunkIndexY);
+        float[,] heightMapSection = SampleHeightMapSection(_heightMap, chunkIndexX, chunkIndexY);
+        int LOD = (chunkIndexX == _chunkCoordX && chunkIndexY == _chunkCoordY) ? 0 : 3;
+
+        //Debug.Log(_chunkCoordX + ", " + _chunkCoordY);
+        //Debug.Log("Chunk IndexL " + chunkIndexX + "," + chunkIndexY + ", LOD: " + LOD);
+
+        ChunkData chunkData = new ChunkData(chunkIndexX, chunkIndexY, heightMapSection, chunkPosition, LOD);
+        _chunkManager.AddChunk(chunkData);
     }
-    public void StartErosion()
+
+    private void UpdateLODMap()
     {
-        if (_erosion == null)
+        // Convert World space to chunk Coordinate
+
+        int newChunkCoordX = (int)((_viewerObject.position.x - WorldStartX) / ChunkSizeX);
+        int newChunkCoordY = (int)((_viewerObject.position.z - WorldStartZ) / ChunkSizeY);
+
+        //Debug.Log("ViewerChunkCoord: " + newChunkCoordX + ", " + newChunkCoordY);
+
+        // Detect Chunk Coordinate Change
+        if(newChunkCoordX != _chunkCoordX || newChunkCoordY != _chunkCoordY)
         {
-            _erosion = GetComponent<Erosion>();
+            int prevCoordX = _chunkCoordX;
+            int prevCoordY = _chunkCoordY;
 
+
+            _chunkCoordX = newChunkCoordX;
+            _chunkCoordY = newChunkCoordY;
+
+            DrawChunk(prevCoordX, prevCoordY);
+            DrawChunk(_chunkCoordX, _chunkCoordY);
         }
-        _currentErosionIterations = _erosionIterations;
-        //StartCoroutine(RunErosion());
+
     }
+
+    private void Update()
+    {
+        // LOD CODE
+
+        // 1 Check for Updated Position
+        if(_previousViewerPosition != _viewerObject.position)
+        {
+            UpdateLODMap();
+        }
+
+        _previousViewerPosition = _viewerObject.position;
+        // 2 if moved convert World Space to Chunk Coordinate space
+
+        // 3 
+    }
+
     private void GetScriptReferences()
     {
         if (_chunkManager == null)
@@ -229,36 +240,18 @@ public class LandscapeGenerator : MonoBehaviour
         {
             _heightMapGenerator = gameObject.GetComponent<HeightMapGenerator>();
         }
-    }
-    private IEnumerator RunErosion()
+    } 
+
+
+
+    public void UpdateTexture(float[,] _heightMap)
     {
-        // TODO Fix Erosion with Removal of landscapeData
-        while (_currentErosionIterations > 0)
-        {
-            //_landscapeData = _erosion.ErosionPass(_landscapeData);
-
-            //GenerateChunks();
-            //_chunkManager.LoadChunks();
-
-            _currentErosionIterations -= 1;
-
-            yield return new WaitForSeconds(_erosionTickTime);
-        }
+        //Texture2D newTexture = _textureGenerator.ValueFromHeightMap(_heightMap);
+        Texture2D newTexture = _textureGenerator.ColourFromHeightMap(_heightMap);
+        newTexture.Apply();
+        _textureDisplay.DrawTexture(newTexture);
     }
 
-    // TODO Fix the Erosion with the new system
-    private void Update()
-    {
-        if (_currentErosionIterations > 0)
-        {
-            //_landscapeData = _erosion.ErosionPass(_landscapeData);
-
-            //GenerateChunks();
-            //_chunkManager.LoadChunks();
-
-            _currentErosionIterations -= 1;
-        }
-    }
 
     private void OnDrawGizmos()
     {
