@@ -1,0 +1,28 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xsi="http://www.w3.org/2001/XMLSchema-instance" engine="UnityEngine.UIElements" editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="True">
+    <Style src="project://database/Assets/_Scripts/MeshGenerationV1/UXML/GeneratedTextureEditorStyle.uss?fileID=7433441132597879392&amp;guid=87658418a8edbf34dbdff15c3cb64372&amp;type=3#GeneratedTextureEditorStyle" />
+    <ui:VisualElement name="Container" style="flex-grow: 1;">
+        <ui:VisualElement name="Header" class="header_group" style="flex-grow: 1;">
+            <ui:Label tabindex="-1" text="Generated Texture" parse-escape-sequences="true" display-tooltip-when-elided="true" class="header-label" />
+        </ui:VisualElement>
+        <ui:Foldout text="&#10;" name="Foldout" value="true" class="section" />
+        <ui:VisualElement name="Content" style="flex-grow: 1;">
+            <ui:VisualElement name="Section1" class="sub-section">
+                <ui:VisualElement name="Header" class="header_group" style="flex-grow: 1; height: auto; width: auto;">
+                    <ui:Label tabindex="-1" text="Draw Settings" parse-escape-sequences="true" display-tooltip-when-elided="true" name="Header" class="header-label" />
+                </ui:VisualElement>
+                <ui:VisualElement name="BaseVars">
+                    <uie:PropertyField name="p_drawMode" binding-path="_drawMode" />
+                    <uie:PropertyField name="p_drawStrength" binding-path="_drawStrength" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement name="Section2" class="sub-section">
+                <ui:VisualElement name="ProceduralTextureVars" style="flex-grow: 1;" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement name="ButtonGroup" class="button_group sub-section">
+            <ui:Button text="Move Up" parse-escape-sequences="true" display-tooltip-when-elided="true" name="MoveUpButton" class="button" />
+            <ui:Button text="Move Down" parse-escape-sequences="true" display-tooltip-when-elided="true" name="MoveDownButton" class="button" style="-unity-text-align: middle-center;" />
+            <ui:Button text="Remove" parse-escape-sequences="true" display-tooltip-when-elided="true" name="RemoveButton" class="button" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

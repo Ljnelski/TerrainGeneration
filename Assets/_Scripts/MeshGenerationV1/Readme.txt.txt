@@ -1,1 +1,0 @@
-Created a Mesh Generator that manually created the triangles with math as Practive. Does not Have Proper UVS.
